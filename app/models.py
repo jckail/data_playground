@@ -1,23 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Enum
+from sqlalchemy import Column, DateTime, JSON, Enum, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 import uuid
 import enum
+from datetime import datetime
 
 Base = declarative_base()
 
-class Item(Base):
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-
 class EventType(enum.Enum):
-    USER_REGISTERED = "user_registered"
-    USER_LOGGED_IN = "user_logged_in"
-    PURCHASE_MADE = "purchase_made"
-    ITEM_ADDED_TO_CART = "item_added_to_cart"
-    ITEM_REMOVED_FROM_CART = "item_removed_from_cart"
+    user_account_creation = "user_account_creation"
+    user_delete_account = "user_delete_account"
+    user_shop_create = "user_shop_create"
+    user_shop_delete = "user_shop_delete"
+    user_deactivate_account = "user_deactivate_account"
 
 class GlobalEvent(Base):
     __tablename__ = "global_events"
@@ -26,3 +21,12 @@ class GlobalEvent(Base):
     event_time = Column(DateTime(timezone=True), nullable=False)
     event_type = Column(Enum(EventType), nullable=False)
     event_metadata = Column(JSON, nullable=True)
+    partition_key = Column(String, nullable=False)
+
+    __table_args__ = {
+        'postgresql_partition_by': 'LIST (partition_key)',
+    }
+
+    @staticmethod
+    def generate_partition_key(event_time):
+        return event_time.strftime("%Y-%m-%d:%H:00")
