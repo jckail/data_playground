@@ -32,8 +32,8 @@ Tables:
 global_events (hourly)
 
 ts : timestamp as a string of the hourly partition (partition key)
+pk event_id : UUID a unique id for the event 
 event_time: timestamp -- actual time of the event
-event_id : UUID a unique id for the event 
 event_type : enum -- an enumerated value describing the event 
 metadata : json 
 
