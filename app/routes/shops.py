@@ -18,7 +18,7 @@ def get_db():
 
 @router.post("/create_shop/", response_model=schemas.GlobalEventResponse)
 def create_shop(shop: schemas.ShopCreate, db: Session = Depends(get_db)):
-    shop_id = str(uuid.uuid4())
+    shop_id = uuid.uuid4()  # Keep as UUID for proper storage and conversion
 
     try:
         # Parse and validate event_time
@@ -34,8 +34,8 @@ def create_shop(shop: schemas.ShopCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
 
     event_metadata = {
-        "shop_id": shop_id,
-        "user_id": shop.user_id,
+        "shop_id": str(shop_id),  # Convert UUID to string for metadata storage
+        "user_id": str(shop.user_id),  # Convert UUID to string for metadata storage
         "shop_name": shop.shop_name
     }
 
@@ -48,11 +48,7 @@ def create_shop(shop: schemas.ShopCreate, db: Session = Depends(get_db)):
     db.add(new_event)
     
     try:
-        # Partition name
-        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
-        
-        # Call the utility function to check and create the partition
-        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+        database.create_partition_if_not_exists(db, "global_events", new_event.partition_key)
         
         db.commit()
         db.refresh(new_event)
@@ -62,9 +58,9 @@ def create_shop(shop: schemas.ShopCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to create shop: {e}")
     
     return schemas.GlobalEventResponse(
-        event_id=new_event.event_id,
+        event_id=str(new_event.event_id),  # Convert UUID to string for response
         event_time=new_event.event_time,
-        event_type=new_event.event_type,
+        event_type=new_event.event_type.value,  # Convert Enum to string for response
         event_metadata=new_event.event_metadata
     )
 
@@ -84,8 +80,8 @@ def delete_shop(shop: schemas.ShopDelete, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
 
     event_metadata = {
-        "shop_id": shop.shop_id,
-        "user_id": shop.user_id
+        "shop_id": str(shop.shop_id),  # Convert UUID to string for metadata storage
+        "user_id": str(shop.user_id) if shop.user_id else None  # Convert UUID to string if user_id is provided
     }
 
     new_event = models.GlobalEvent(
@@ -111,8 +107,8 @@ def delete_shop(shop: schemas.ShopDelete, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to delete shop: {e}")
     
     return schemas.GlobalEventResponse(
-        event_id=new_event.event_id,
+        event_id=str(new_event.event_id),  # Convert UUID to string for response
         event_time=new_event.event_time,
-        event_type=new_event.event_type,
+        event_type=new_event.event_type.value,  # Convert Enum to string for response
         event_metadata=new_event.event_metadata
     )

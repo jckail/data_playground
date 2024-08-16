@@ -9,12 +9,16 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://user:password@db/dbname
+      - PYTHONPATH=/code
+    volumes:
+      - ./app:/code/app
+      - ./alembic:/code/alembic
+      - ./alembic.ini:/code/alembic.ini
 
   db:
     image: postgres:13
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password

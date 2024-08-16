@@ -1,10 +1,11 @@
-from sqlalchemy import Column, DateTime, JSON, Enum, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime,  Enum, String,  Float , Boolean, ForeignKey, Date
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import declarative_base
 import uuid
 import enum
 from datetime import datetime
 import asyncio
+
 
 Base = declarative_base()
 
@@ -15,6 +16,7 @@ class EventType(enum.Enum):
     user_shop_delete = "user_shop_delete"
     user_deactivate_account = "user_deactivate_account"
 
+
 class GlobalEvent(Base):
     __tablename__ = "global_events"
 
@@ -22,7 +24,7 @@ class GlobalEvent(Base):
     event_time = Column(DateTime(timezone=True), nullable=False)
     event_type = Column(Enum(EventType), nullable=False)
     event_metadata = Column(JSON, nullable=True)
-    partition_key = Column(String, nullable=False)
+    partition_key = Column(String, primary_key=True, nullable=False)
 
     __table_args__ = {
         'postgresql_partition_by': 'LIST (partition_key)',
@@ -31,7 +33,66 @@ class GlobalEvent(Base):
     @staticmethod
     def generate_partition_key(event_time):
         return event_time.strftime("%Y-%m-%d:%H:00")
-    
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), nullable=False)
+    status = Column(Boolean, nullable=False, default=True)
+    created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    deactivated_time = Column(DateTime(timezone=True))
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+
+    __table_args__ = (
+        {'postgresql_partition_by': 'RANGE (partition_key)'},
+    )
+
+
+class Shop(Base):
+    __tablename__ = 'shops'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    shop_owner_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    shop_name = Column(String(255), nullable=False)
+    created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    deactivated_time = Column(DateTime(timezone=True))
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+
+    __table_args__ = {
+        'postgresql_partition_by': 'RANGE (partition_key)',
+    }
+
+class UserInvoice(Base):
+    __tablename__ = 'user_invoices'
+
+    invoice_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    shop_id = Column(UUID(as_uuid=True), ForeignKey('shops.id'), nullable=False)
+    invoice_amount = Column(Float, nullable=False)
+    event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+
+    __table_args__ = {
+        'postgresql_partition_by': 'RANGE (partition_key)',
+    }
+
+class Payment(Base):
+    __tablename__ = 'payments'
+
+    payment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id = Column(UUID(as_uuid=True), ForeignKey('user_invoices.invoice_id'), nullable=False)
+    payment_amount = Column(Float, nullable=False)
+    event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+
+    __table_args__ = {
+        'postgresql_partition_by': 'RANGE (partition_key)',
+    }
+
+    @staticmethod
+    def generate_partition_key(event_time):
+        return event_time.strftime('%Y-%m-%d')
 
 
 class EventPropensity:
@@ -43,13 +104,11 @@ class EventPropensity:
         max_multiple_shop_creation_percentage=0.1,
         max_shop_churn=0.2,
     ):
-
         self.max_fake_users_per_day = max_fake_users_per_day
         self.max_user_churn = max_user_churn
         self.max_first_shop_creation_percentage = max_first_shop_creation_percentage
         self.max_multiple_shop_creation_percentage = max_multiple_shop_creation_percentage
         self.max_shop_churn = max_shop_churn
-
 
 class FakeHelper:
     def __init__(
@@ -62,7 +121,6 @@ class FakeHelper:
         users=None,
         shops=None,
     ):
-
         self.daily_users_created = daily_users_created
         self.daily_users_deactivated = daily_users_deactivated
         self.daily_shops_created = daily_shops_created

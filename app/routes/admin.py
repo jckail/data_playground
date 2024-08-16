@@ -4,6 +4,7 @@ from .. import database, schemas  # Import the schemas module
 from ..utils.generate_fake_data import generate_fake_data
 from datetime import datetime, timedelta
 import pytz
+from sqlalchemy import text
 
 from ..models import EventPropensity, FakeHelper
 
@@ -86,3 +87,66 @@ async def trigger_fake_data_generation(
         "end_date": fdq.end_date.isoformat(),
         "summary": result_summary,
     }
+
+
+
+@router.post("/user_snapshot")
+def user_snapshot(snapshot_date: datetime, db: Session = Depends(get_db)):
+    try:
+        # Partition key based on the snapshot_date
+        partition_key = snapshot_date.date()
+        previous_day = partition_key - timedelta(days=1)
+
+        # Query to get all user creation events for the specified date and previous day
+        creation_query = text("""
+            SELECT 
+                event_metadata->>'user_id' AS user_id,
+                event_time
+            FROM global_events
+            WHERE event_type = 'user_account_creation'
+            AND event_time::date IN (:snapshot_date, :previous_day)
+        """)
+
+        creation_events = db.execute(creation_query, {"snapshot_date": partition_key, "previous_day": previous_day}).fetchall()
+
+        # Query to get all user deletion events for the specified date and previous day
+        deletion_query = text("""
+            SELECT 
+                event_metadata->>'user_id' AS user_id,
+                event_time
+            FROM global_events
+            WHERE event_type = 'user_delete_account'
+            AND event_time::date IN (:snapshot_date, :previous_day)
+        """)
+
+        deletion_events = db.execute(deletion_query, {"snapshot_date": partition_key, "previous_day": previous_day}).fetchall()
+
+        # Process creation events
+        for event in creation_events:
+            db.execute(
+                text("""
+                    INSERT INTO users (id, status, created_time, deactivated_time, partition_key)
+                    VALUES (:user_id, TRUE, :created_time, NULL, :partition_key)
+                    ON CONFLICT (id, partition_key) DO NOTHING
+                """),
+                {"user_id": event.user_id, "created_time": event.event_time, "partition_key": partition_key}
+            )
+
+        # Process deletion events
+        for event in deletion_events:
+            db.execute(
+                text("""
+                    UPDATE users 
+                    SET status = FALSE, deactivated_time = :deactivated_time
+                    WHERE id = :user_id AND partition_key = :partition_key
+                """),
+                {"user_id": event.user_id, "deactivated_time": event.event_time, "partition_key": partition_key}
+            )
+
+        db.commit()
+
+        return {"message": "User snapshot completed successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"User snapshot failed: {e}")
