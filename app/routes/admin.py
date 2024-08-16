@@ -56,12 +56,14 @@ async def run_data_generation(
         current_date = start_date + timedelta(days=i)
         z = await generate_fake_data(current_date, z, ep, fh)
         await run_rollup(current_date, "user_snapshot")
+        await run_rollup(current_date, "shop_snapshot")
 
 
     # Calculate the total runtime
     end_time = time.time()
     run_time = end_time - start_time
 
+    #@TODO: FIX SUMMARY DICT the counts are wrong!
     summary_dict = {
             "total_users_created": sum(z[current_date].daily_users_created for current_date in z),
             "total_users_deactivated": sum(z[current_date].daily_users_deactivated for current_date in z),
@@ -92,7 +94,7 @@ async def trigger_fake_data_generation(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    yesterday = datetime.now(pytz.utc).date() - timedelta(days=1)
+    yesterday = datetime.now(pytz.utc).date() - timedelta(minutes=1)
 
     if fdq.start_date.date() > yesterday:
         raise HTTPException(
