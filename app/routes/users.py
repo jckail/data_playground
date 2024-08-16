@@ -33,25 +33,39 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
+
+    # Convert event_time to datetime object explicitly (even if already datetime, no harm)
+    event_time = datetime.fromisoformat(event_time.isoformat())
     
+    # Debugging: Print or log the type to ensure it's a datetime object
+    #print(f"event_time type: {type(event_time)}")
+    
+    # Ensure event_time is a datetime object at this point
+    if not isinstance(event_time, datetime):
+        raise HTTPException(status_code=400, detail="event_time must be a datetime object")
+
     # Create event metadata
     event_metadata = {
         "user_id": str(user_id),
         "email": user.email
     }
 
-    # Create a new GlobalEvent
-    new_event = models.GlobalEvent(
-        event_time=event_time,
-        event_type=models.EventType.user_account_creation,
-        event_metadata=event_metadata,
-        partition_key=models.GlobalEvent.generate_partition_key(event_time)
-    )
-    db.add(new_event)
 
     try:
+        partition_key = models.GlobalEvent.generate_partition_key(event_time)
+        
+
         # Create the partition if it doesn't exist
-        database.create_partition_if_not_exists(db, "global_events", new_event.partition_key)
+        database.create_partition_if_not_exists(db, "global_events", partition_key)
+
+        new_event = models.GlobalEvent(
+            event_time=event_time,
+            event_type=models.EventType.user_account_creation,
+            event_metadata=event_metadata,
+            partition_key=partition_key
+        )
+        db.add(new_event)
+
 
         db.commit()
         db.refresh(new_event)
@@ -67,6 +81,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         event_type=new_event.event_type.value,
         event_metadata=new_event.event_metadata
     )
+
 
 
 @router.post("/deactivate_user/", response_model=schemas.GlobalEventResponse)
@@ -103,13 +118,10 @@ def deactivate_user(user: schemas.UserDeactivate, db: Session = Depends(get_db))
         partition_key=models.GlobalEvent.generate_partition_key(event_time)
     )
     db.add(new_event)
-    
+
     try:
-        # Define partition name
-        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
-        
         # Create the partition if it doesn't exist
-        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+        database.create_partition_if_not_exists(db, "global_events", new_event.partition_key)
 
         db.commit()
         db.refresh(new_event)
@@ -120,8 +132,8 @@ def deactivate_user(user: schemas.UserDeactivate, db: Session = Depends(get_db))
 
     # Return the GlobalEvent response
     return schemas.GlobalEventResponse(
-        event_id=str(new_event.event_id),  # Convert UUID to string for response
+        event_id=str(new_event.event_id),
         event_time=new_event.event_time,
-        event_type=new_event.event_type.value,  # Convert EventType enum to string
+        event_type=new_event.event_type.value,
         event_metadata=new_event.event_metadata
     )

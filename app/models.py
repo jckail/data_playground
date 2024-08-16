@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime,  Enum, String,  Float , Boolean, ForeignKey, Date
+from sqlalchemy import Column, DateTime,  Enum, String,  Float , Boolean, ForeignKey, Date, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import declarative_base
 import uuid
@@ -32,6 +32,9 @@ class GlobalEvent(Base):
 
     @staticmethod
     def generate_partition_key(event_time):
+        # Add debugging here to ensure event_time is correct
+        if not isinstance(event_time, datetime):
+            print(f"Incorrect event_time type: {type(event_time)}")
         return event_time.strftime("%Y-%m-%d:%H:00")
 
 class User(Base):
@@ -42,8 +45,15 @@ class User(Base):
     status = Column(Boolean, nullable=False, default=True)
     created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     deactivated_time = Column(DateTime(timezone=True))
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
+    @staticmethod
+    def generate_partition_key(event_date):
+        # Add debugging here to ensure event_time is correct
+        if not isinstance(event_date, datetime):
+            print(f"Incorrect event_time type: {type(event_date)}")
+        return event_date.strftime("%Y-%m-%d")
+    
     __table_args__ = (
         {'postgresql_partition_by': 'RANGE (partition_key)'},
     )
@@ -53,42 +63,58 @@ class Shop(Base):
     __tablename__ = 'shops'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    shop_owner_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    shop_owner_id = Column(UUID(as_uuid=True), nullable=False)
     shop_name = Column(String(255), nullable=False)
     created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     deactivated_time = Column(DateTime(timezone=True))
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
-    __table_args__ = {
-        'postgresql_partition_by': 'RANGE (partition_key)',
-    }
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['shop_owner_id', 'partition_key'],
+            ['users.id', 'users.partition_key']
+        ),
+        {'postgresql_partition_by': 'RANGE (partition_key)'},
+    )
 
 class UserInvoice(Base):
     __tablename__ = 'user_invoices'
 
     invoice_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
-    shop_id = Column(UUID(as_uuid=True), ForeignKey('shops.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    shop_id = Column(UUID(as_uuid=True), nullable=False)
     invoice_amount = Column(Float, nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
-    __table_args__ = {
-        'postgresql_partition_by': 'RANGE (partition_key)',
-    }
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['user_id', 'partition_key'],
+            ['users.id', 'users.partition_key']
+        ),
+        ForeignKeyConstraint(
+            ['shop_id', 'partition_key'],
+            ['shops.id', 'shops.partition_key']
+        ),
+        {'postgresql_partition_by': 'RANGE (partition_key)'},
+    )
 
 class Payment(Base):
     __tablename__ = 'payments'
 
     payment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey('user_invoices.invoice_id'), nullable=False)
+    invoice_id = Column(UUID(as_uuid=True), nullable=False)
     payment_amount = Column(Float, nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
-    __table_args__ = {
-        'postgresql_partition_by': 'RANGE (partition_key)',
-    }
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['invoice_id', 'partition_key'],
+            ['user_invoices.invoice_id', 'user_invoices.partition_key']
+        ),
+        {'postgresql_partition_by': 'RANGE (partition_key)'},
+    )
 
     @staticmethod
     def generate_partition_key(event_time):

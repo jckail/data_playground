@@ -4,6 +4,16 @@ from typing import Dict, Union, Optional
 import pytz
 from .models import EventType
 
+
+
+class UserSnapshotResponse(BaseModel):
+    event_time: datetime
+    event_type: str
+    event_metadata: Dict
+
+    class Config:
+        from_attributes = True  # Updated from orm_mode to from_attributes as per Pydantic v2
+
 # User Schemas
 class UserCreate(BaseModel):
     email: EmailStr
@@ -28,6 +38,13 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True  # Updated from orm_mode to from_attributes as per Pydantic v2
+
+class UserSnapshot(BaseModel):
+    event_time: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True  # Updated from orm_mode to from_attributes as per Pydantic v2
+
 
 
 # Shop Schemas

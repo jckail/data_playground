@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: 94567e87d528
+Revision ID: 7fbf25a7112b
 Revises: 
-Create Date: 2024-08-16 04:26:42.764529
+Create Date: 2024-08-16 07:22:10.276847
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '94567e87d528'
+revision: str = '7fbf25a7112b'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -35,7 +35,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Boolean(), nullable=False),
     sa.Column('created_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('deactivated_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('partition_key', sa.Date(), nullable=False),
+    sa.Column('partition_key', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
@@ -45,7 +45,8 @@ def upgrade() -> None:
     sa.Column('shop_name', sa.String(length=255), nullable=False),
     sa.Column('created_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('deactivated_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('partition_key', sa.Date(), nullable=False),
+    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['shop_owner_id', 'partition_key'], ['users.id', 'users.partition_key'], ),
     sa.PrimaryKeyConstraint('id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
@@ -55,7 +56,9 @@ def upgrade() -> None:
     sa.Column('shop_id', sa.UUID(), nullable=False),
     sa.Column('invoice_amount', sa.Float(), nullable=False),
     sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('partition_key', sa.Date(), nullable=False),
+    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['shop_id', 'partition_key'], ['shops.id', 'shops.partition_key'], ),
+    sa.ForeignKeyConstraint(['user_id', 'partition_key'], ['users.id', 'users.partition_key'], ),
     sa.PrimaryKeyConstraint('invoice_id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
@@ -64,16 +67,11 @@ def upgrade() -> None:
     sa.Column('invoice_id', sa.UUID(), nullable=False),
     sa.Column('payment_amount', sa.Float(), nullable=False),
     sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('partition_key', sa.Date(), nullable=False),
+    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['invoice_id', 'partition_key'], ['user_invoices.invoice_id', 'user_invoices.partition_key'], ),
     sa.PrimaryKeyConstraint('payment_id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
-    
-    # Add foreign key constraints after table creation
-    op.execute('ALTER TABLE shops ADD CONSTRAINT fk_shop_owner FOREIGN KEY (shop_owner_id, partition_key) REFERENCES users (id, partition_key)')
-    op.execute('ALTER TABLE user_invoices ADD CONSTRAINT fk_user_invoice_user FOREIGN KEY (user_id, partition_key) REFERENCES users (id, partition_key)')
-    op.execute('ALTER TABLE user_invoices ADD CONSTRAINT fk_user_invoice_shop FOREIGN KEY (shop_id, partition_key) REFERENCES shops (id, partition_key)')
-    op.execute('ALTER TABLE payments ADD CONSTRAINT fk_payment_invoice FOREIGN KEY (invoice_id, partition_key) REFERENCES user_invoices (invoice_id, partition_key)')
     # ### end Alembic commands ###
 
 
