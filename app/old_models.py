@@ -1,10 +1,15 @@
 from sqlalchemy import Column, DateTime,  Enum, String,  Float , Boolean, ForeignKey, Date, ForeignKeyConstraint
+from sqlalchemy.sql import text
 from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, declarative_mixin
+from sqlalchemy.ext.declarative import declared_attr
 import uuid
 import enum
 from datetime import datetime
 import asyncio
+from . import  schemas
+from fastapi import  HTTPException
+from sqlalchemy.ext.hybrid import hybrid_property
 
 
 Base = declarative_base()
@@ -17,49 +22,93 @@ class EventType(enum.Enum):
     user_deactivate_account = "user_deactivate_account"
 
 
-class GlobalEvent(Base):
+#flow
+# 
+
+
+@declarative_mixin
+class PartitionedModel:
+
+    partition_key = Column(String, primary_key=True, nullable=False)
+
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
+
+    def generate_partition_key(self, db):
+        event_time = getattr(self, self.__partition_field__, None)
+        if not isinstance(event_time, datetime):
+            print(f"Invalid Datetime {self.__partition_field__} type: {event_time} --> {type(event_time)}")
+            event_time = datetime.utcnow()
+
+        if self.__partitiontype__ == "hourly":
+            partition_key = event_time.strftime("%Y-%m-%d:%H:00")
+        elif self.__partitiontype__ == "daily":
+            partition_key = event_time.strftime("%Y-%m-%d")
+        else:
+            raise ValueError("Invalid partition type")
+
+        partition_name = f"{self.__tablename__}_p_{partition_key.replace('-', '_').replace(':', '_')}"
+        db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
+            FOR VALUES IN ('{partition_key}')
+        """))
+        db.commit()
+        
+        return partition_key
+
+    @classmethod
+    def create_with_partition(cls, db, **kwargs):
+        try:
+            instance = cls(**kwargs)
+            instance.partition_key = instance.generate_partition_key(db)
+            db.add(instance)
+            db.commit()
+            db.refresh(instance)
+            return instance
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+
+class GlobalEvent(Base, PartitionedModel):
     __tablename__ = "global_events"
+    __partitiontype__ = "hourly"
+    __partition_field__ = "event_time"
 
     event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_time = Column(DateTime(timezone=True), nullable=False)
     event_type = Column(Enum(EventType), nullable=False)
     event_metadata = Column(JSON, nullable=True)
-    partition_key = Column(String, primary_key=True, nullable=False)
+    
+    __table_args__ = {'postgresql_partition_by': 'LIST (partition_key)'}
 
-    __table_args__ = {
-        'postgresql_partition_by': 'LIST (partition_key)',
-    }
+    @hybrid_property
+    def response(self):
+        return schemas.GlobalEventResponse(
+            event_id=str(self.event_id),
+            event_time=self.event_time,
+            event_type=self.event_type.value,
+            event_metadata=self.event_metadata
+        )
 
-    @staticmethod
-    def generate_partition_key(event_time):
-        # Add debugging here to ensure event_time is correct
-        if not isinstance(event_time, datetime):
-            print(f"Incorrect event_time type: {type(event_time)}")
-        return event_time.strftime("%Y-%m-%d:%H:00")
-
-class User(Base):
+class User(Base, PartitionedModel):
     __tablename__ = 'users'
+    __partitiontype__ = "daily"
+    __partition_field__ = "event_time"
 
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False)
     status = Column(Boolean, nullable=False, default=True)
     created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     deactivated_time = Column(DateTime(timezone=True))
-    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
-
-    @staticmethod
-    def generate_partition_key(event_date):
-        # Add debugging here to ensure event_time is correct
-        if not isinstance(event_date, datetime):
-            print(f"Incorrect event_time type: {type(event_date)}")
-        return event_date.strftime("%Y-%m-%d")
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
     
-    __table_args__ = (
-        {'postgresql_partition_by': 'RANGE (partition_key)'},
-    )
+    __table_args__ = {'postgresql_partition_by': 'RANGE (partition_key)'}
 
 
-class Shop(Base):
+
+class Shop(Base, PartitionedModel):
     __tablename__ = 'shops'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -67,7 +116,7 @@ class Shop(Base):
     shop_name = Column(String(255), nullable=False)
     created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     deactivated_time = Column(DateTime(timezone=True))
-    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -77,7 +126,7 @@ class Shop(Base):
         {'postgresql_partition_by': 'RANGE (partition_key)'},
     )
 
-class UserInvoice(Base):
+class UserInvoice(Base, PartitionedModel):
     __tablename__ = 'user_invoices'
 
     invoice_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -85,7 +134,7 @@ class UserInvoice(Base):
     shop_id = Column(UUID(as_uuid=True), nullable=False)
     invoice_amount = Column(Float, nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -99,14 +148,14 @@ class UserInvoice(Base):
         {'postgresql_partition_by': 'RANGE (partition_key)'},
     )
 
-class Payment(Base):
+class Payment(Base, PartitionedModel):
     __tablename__ = 'payments'
 
     payment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     invoice_id = Column(UUID(as_uuid=True), nullable=False)
     payment_amount = Column(Float, nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    partition_key = Column(String, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -115,10 +164,6 @@ class Payment(Base):
         ),
         {'postgresql_partition_by': 'RANGE (partition_key)'},
     )
-
-    @staticmethod
-    def generate_partition_key(event_time):
-        return event_time.strftime('%Y-%m-%d')
 
 
 class EventPropensity:

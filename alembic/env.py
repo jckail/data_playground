@@ -10,7 +10,7 @@ from alembic import context
 # Add the parent directory of 'app' to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-# Import your models and settings
+# Import your models
 from app.models import Base
 from app.database import SQLALCHEMY_DATABASE_URL
 
@@ -58,7 +58,8 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, 
+            target_metadata=target_metadata
         )
 
         with context.begin_transaction():

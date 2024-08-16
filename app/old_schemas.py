@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr, UUID4, Field
 from datetime import datetime, timedelta, date
 from typing import Dict, Union, Optional
 import pytz
-from .models import EventType
 
 
 

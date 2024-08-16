@@ -1,105 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from .. import models, schemas, database
-from datetime import datetime
+from ..models import GlobalEvent, EventType
+from ..schemas import UserCreate, UserDeactivate, GlobalEventResponse
+from ..database import get_db, parse_event_time
+from ..utils.user_helpers import create_user_metadata, get_user_by_identifier
 import uuid
-from dateutil.parser import parse
-import pytz
 
 router = APIRouter()
 
-# Dependency to get DB session
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@router.post("/create_user/", response_model=GlobalEventResponse)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    event_metadata = create_user_metadata(str(uuid.uuid4()), user.email)
 
-@router.post("/create_user/", response_model=schemas.GlobalEventResponse)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    user_id = uuid.uuid4()
-
-    try:
-        # Parse and validate event_time
-        if isinstance(user.event_time, str):
-            event_time = parse(user.event_time)
-        elif user.event_time is None:
-            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
-        elif isinstance(user.event_time, datetime):
-            event_time = user.event_time
-        else:
-            raise ValueError("event_time must be a datetime object or a valid datetime string")
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
-
-    # Convert event_time to datetime object explicitly (even if already datetime, no harm)
-    event_time = datetime.fromisoformat(event_time.isoformat())
-    
-    # Debugging: Print or log the type to ensure it's a datetime object
-    #print(f"event_time type: {type(event_time)}")
-    
-    # Ensure event_time is a datetime object at this point
-    if not isinstance(event_time, datetime):
-        raise HTTPException(status_code=400, detail="event_time must be a datetime object")
-
-    # Create event metadata
-    event_metadata = {
-        "user_id": str(user_id),
-        "email": user.email
-    }
-
-
-    try:
-        partition_key = models.GlobalEvent.generate_partition_key(event_time)
-        
-
-        # Create the partition if it doesn't exist
-        database.create_partition_if_not_exists(db, "global_events", partition_key)
-
-        new_event = models.GlobalEvent(
-            event_time=event_time,
-            event_type=models.EventType.user_account_creation,
-            event_metadata=event_metadata,
-            partition_key=partition_key
-        )
-        db.add(new_event)
-
-
-        db.commit()
-        db.refresh(new_event)
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create user: {e}")
-
-    # Return the GlobalEvent response
-    return schemas.GlobalEventResponse(
-        event_id=str(new_event.event_id),
-        event_time=new_event.event_time,
-        event_type=new_event.event_type.value,
-        event_metadata=new_event.event_metadata
+    new_event = GlobalEvent.create_with_partition(
+        db,
+        event_time=parse_event_time(user.event_time),
+        event_type=EventType.user_account_creation,
+        event_metadata=event_metadata
     )
 
+    return GlobalEventResponse.from_orm(new_event)
 
 
-@router.post("/deactivate_user/", response_model=schemas.GlobalEventResponse)
-def deactivate_user(user: schemas.UserDeactivate, db: Session = Depends(get_db)):
-    try:
-        # Parse and validate event_time
-        if isinstance(user.event_time, str):
-            event_time = parse(user.event_time)
-        elif user.event_time is None:
-            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
-        elif isinstance(user.event_time, datetime):
-            event_time = user.event_time
-        else:
-            raise ValueError("event_time must be a datetime object or a valid datetime string")
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
-
+@router.post("/deactivate_user/", response_model=GlobalEventResponse)
+def deactivate_user(user: UserDeactivate, db: Session = Depends(get_db)):
     # Determine if the identifier is an email or user_id and create event metadata accordingly
     if '@' in user.identifier:
         event_metadata = {
@@ -110,30 +34,48 @@ def deactivate_user(user: schemas.UserDeactivate, db: Session = Depends(get_db))
             "user_id": user.identifier
         }
 
-    # Create a new GlobalEvent for deactivation
-    new_event = models.GlobalEvent(
-        event_time=event_time,
-        event_type=models.EventType.user_deactivate_account,
-        event_metadata=event_metadata,
-        partition_key=models.GlobalEvent.generate_partition_key(event_time)
+    new_event = GlobalEvent.create_with_partition(
+        db,
+        event_time=parse_event_time(user.event_time),
+        event_type=EventType.user_deactivate_account,
+        event_metadata=event_metadata
     )
-    db.add(new_event)
 
-    try:
-        # Create the partition if it doesn't exist
-        database.create_partition_if_not_exists(db, "global_events", new_event.partition_key)
+    return new_event.response
 
-        db.commit()
-        db.refresh(new_event)
 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to deactivate user: {e}")
+# @router.post("/deactivate_user/", response_model=GlobalEventResponse)
+# def deactivate_user(user: UserDeactivate, db: Session = Depends(get_db)):
+#     db_user = get_user_by_identifier(db, user.identifier)
+#     if not db_user:
+#         raise HTTPException(status_code=404, detail="User not found")
 
-    # Return the GlobalEvent response
-    return schemas.GlobalEventResponse(
-        event_id=str(new_event.event_id),
-        event_time=new_event.event_time,
-        event_type=new_event.event_type.value,
-        event_metadata=new_event.event_metadata
-    )
+#     event_metadata = create_user_metadata(str(db_user.id), db_user.email)
+
+#     new_event = GlobalEvent.create_with_partition(
+#         db,
+#         event_time=parse_event_time(user.event_time),
+#         event_type=EventType.user_deactivate_account,
+#         event_metadata=event_metadata
+#     )
+
+#     # Here you might want to actually deactivate the user in the database
+#     # db_user.is_active = False
+#     # db.commit()
+
+#     return GlobalEventResponse.from_orm(new_event)
+
+# @router.get("/user/{user_id}", response_model=GlobalEventResponse)
+# def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
+#     db_user = get_user_by_identifier(db, str(user_id))
+#     if not db_user:
+#         raise HTTPException(status_code=404, detail="User not found")
+
+#     event_metadata = create_user_metadata(str(db_user.id), db_user.email)
+
+#     return GlobalEventResponse(
+#         event_id=str(uuid.uuid4()),
+#         event_time=db_user.created_time,
+#         event_type=EventType.user_account_creation.value,
+#         event_metadata=event_metadata
+#     )

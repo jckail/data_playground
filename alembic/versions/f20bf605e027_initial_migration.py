@@ -1,18 +1,18 @@
 """Initial migration
 
-Revision ID: 7fbf25a7112b
+Revision ID: f20bf605e027
 Revises: 
-Create Date: 2024-08-16 07:22:10.276847
+Create Date: 2024-08-16 18:47:57.834645
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
-revision: str = '7fbf25a7112b'
+revision: str = 'f20bf605e027'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,7 +24,7 @@ def upgrade() -> None:
     sa.Column('event_id', sa.UUID(), nullable=False),
     sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('event_type', sa.Enum('user_account_creation', 'user_delete_account', 'user_shop_create', 'user_shop_delete', 'user_deactivate_account', name='eventtype'), nullable=False),
-    sa.Column('event_metadata', postgresql.JSON(astext_type=sa.Text()), nullable=True),
+    sa.Column('event_metadata', sa.JSON(), nullable=True),
     sa.Column('partition_key', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('event_id', 'partition_key'),
     postgresql_partition_by='LIST (partition_key)'
@@ -35,7 +35,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Boolean(), nullable=False),
     sa.Column('created_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('deactivated_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.Column('partition_key', sa.Date(), nullable=False),
     sa.PrimaryKeyConstraint('id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
@@ -45,7 +45,7 @@ def upgrade() -> None:
     sa.Column('shop_name', sa.String(length=255), nullable=False),
     sa.Column('created_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('deactivated_time', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.Column('partition_key', sa.Date(), nullable=False),
     sa.ForeignKeyConstraint(['shop_owner_id', 'partition_key'], ['users.id', 'users.partition_key'], ),
     sa.PrimaryKeyConstraint('id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
@@ -56,7 +56,7 @@ def upgrade() -> None:
     sa.Column('shop_id', sa.UUID(), nullable=False),
     sa.Column('invoice_amount', sa.Float(), nullable=False),
     sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.Column('partition_key', sa.Date(), nullable=False),
     sa.ForeignKeyConstraint(['shop_id', 'partition_key'], ['shops.id', 'shops.partition_key'], ),
     sa.ForeignKeyConstraint(['user_id', 'partition_key'], ['users.id', 'users.partition_key'], ),
     sa.PrimaryKeyConstraint('invoice_id', 'partition_key'),
@@ -67,7 +67,7 @@ def upgrade() -> None:
     sa.Column('invoice_id', sa.UUID(), nullable=False),
     sa.Column('payment_amount', sa.Float(), nullable=False),
     sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.Column('partition_key', sa.Date(), nullable=False),
     sa.ForeignKeyConstraint(['invoice_id', 'partition_key'], ['user_invoices.invoice_id', 'user_invoices.partition_key'], ),
     sa.PrimaryKeyConstraint('payment_id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'

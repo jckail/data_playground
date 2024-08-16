@@ -136,28 +136,17 @@ def user_snapshot(
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
+        # Paths: 
+        # format: yyyy-mm-dd
+        # Timestamp
+        # Date --> STR
+
 
         # Debugging: Ensure these are date objects
         print(f"partition_key: {partition_key}, type: {type(partition_key)}")
         print(f"previous_day: {previous_day}, type: {type(previous_day)}")
 
-        # Ensure the partitions exist before processing events
-        partition_key = database.create_partition_if_not_exists(
-            db,
-            "users",
-            models.User.generate_partition_key(partition_key),
-            start_date=previous_day,
-            end_date=partition_key,
-        )
-        db.commit()
 
-        previous_day = database.create_partition_if_not_exists(
-            db,
-            "users",
-            models.User.generate_partition_key(previous_day),
-
-        )
-        db.commit()
 
 
 
@@ -197,6 +186,7 @@ def process_user_events(db: Session, partition_key: date, previous_day: date):
 
 
 def get_user_events(db: Session, partition_key: str, previous_day: str):
+
 
     query = text(
         """
@@ -255,9 +245,9 @@ def get_user_events(db: Session, partition_key: str, previous_day: str):
     db.execute(
         query,
         {
-            "ge_key" : ge_key,
-            "partition_key": partition_key,
+            
             "previous_day": previous_day,
+            "partition_key": partition_key,
         }
     )
 
