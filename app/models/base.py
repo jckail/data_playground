@@ -25,29 +25,33 @@ class PartitionedModel:
             event_time = datetime.utcnow()
 
         if self.__partitiontype__ == "hourly":
-            partition_key = event_time.strftime("%Y-%m-%d:%H:00")
-            next_partition = (event_time + timedelta(hours=1)).strftime("%Y-%m-%d:%H:00")
+            partition_key = event_time.strftime("%Y-%m-%dT%H:00:00")
+            #next_partition = (event_time + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00:00")
+            partition_name = generate_partition_name(self.__tablename__, partition_key.replace(':', '_'))
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
+                FOR VALUES IN ('{partition_key}')
+            """))
         elif self.__partitiontype__ == "daily":
             partition_key = event_time.strftime("%Y-%m-%d")
             next_partition = (event_time + timedelta(days=1)).strftime("%Y-%m-%d")
+            partition_name = generate_partition_name(self.__tablename__, partition_key.replace(':', '_'))
+            db.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
+                FOR VALUES FROM ('{partition_key}') TO ('{next_partition}')
+            """))
         else:
             raise ValueError("Invalid partition type")
 
-        partition_name = generate_partition_name(self.__tablename__, partition_key)
-        db.execute(text(f"""
-            CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
-            FOR VALUES FROM ('{partition_key}') TO ('{next_partition}')
-        """))
+
         db.commit()
         
         return partition_key
 
     @classmethod
-    def create_with_partition(cls, db,  **kwargs):
+    def create_with_partition(cls, db, **kwargs):
         try:
             instance = cls(**kwargs)
-            instance.partition_key = instance.generate_partition_key(db)
-
             instance.partition_key = instance.generate_partition_key(db)
             db.add(instance)
             db.commit()
@@ -56,6 +60,7 @@ class PartitionedModel:
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create {cls.__name__}: {str(e)}")
+
 
     @classmethod
     def validate_partition(cls, db,   **kwargs):

@@ -55,7 +55,7 @@ async def run_data_generation(
     for i in range((end_date - start_date).days + 1):
         current_date = start_date + timedelta(days=i)
         z = await generate_fake_data(current_date, z, ep, fh)
-        await run_rollup(current_date, "user_snapshot")
+        #await run_rollup(current_date, "user_snapshot")
 
 
     # Calculate the total runtime

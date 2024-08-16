@@ -12,16 +12,5 @@ class UserInvoice(Base, PartitionedModel):
     shop_id = Column(UUID(as_uuid=True), nullable=False)
     invoice_amount = Column(Float, nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
 
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ['user_id', 'partition_key'],
-            ['users.id', 'users.partition_key']
-        ),
-        ForeignKeyConstraint(
-            ['shop_id', 'partition_key'],
-            ['shops.id', 'shops.partition_key']
-        ),
-        {'postgresql_partition_by': 'RANGE (partition_key)'},
-    )
+    __table_args__ = {'postgresql_partition_by': 'RANGE (partition_key)'}
