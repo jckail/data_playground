@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import ProgrammingError
 from .. import models, schemas, database
 from datetime import datetime
 import uuid
+from dateutil.parser import parse
+import pytz
 
 router = APIRouter()
 
@@ -16,17 +16,29 @@ def get_db():
     finally:
         db.close()
 
-
-
 @router.post("/create_user/", response_model=schemas.GlobalEventResponse)
-def create_user(user: schemas.UserCreate, event_time: datetime = None, db: Session = Depends(get_db)):
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     user_id = str(uuid.uuid4())
-    if event_time is None:
-        event_time = datetime.utcnow()
+
+    try:
+        # Parse and validate event_time
+        if isinstance(user.event_time, str):
+            event_time = parse(user.event_time)
+        elif user.event_time is None:
+            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+        elif isinstance(user.event_time, datetime):
+            event_time = user.event_time
+        else:
+            raise ValueError("event_time must be a datetime object or a valid datetime string")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
+    
     event_metadata = {
         "user_id": user_id,
         "email": user.email
     }
+
     new_event = models.GlobalEvent(
         event_time=event_time,
         event_type=models.EventType.user_account_creation,
@@ -34,22 +46,20 @@ def create_user(user: schemas.UserCreate, event_time: datetime = None, db: Sessi
         partition_key=models.GlobalEvent.generate_partition_key(event_time)
     )
     db.add(new_event)
-    
-    # Create partition if it doesn't exist
-    partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
+
     try:
-        db.execute(text(f"""
-        CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF global_events
-        FOR VALUES IN ('{new_event.partition_key}')
-        """))
-        db.commit()  # Commit the transaction if the table creation is successful
-    except ProgrammingError as e:
-        db.rollback()  # Rollback if an error occurs to maintain database integrity
-        if "DuplicateTable" not in str(e.orig):
-            raise e  # Re-raise if the error is not a DuplicateTable error
-    
-    db.refresh(new_event)
-    
+        # Partition name
+        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
+        # Call the utility function to check and create the partition
+        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+
+        db.commit()
+        db.refresh(new_event)
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {e}")
+
     return schemas.GlobalEventResponse(
         event_id=new_event.event_id,
         event_time=new_event.event_time,
@@ -58,10 +68,21 @@ def create_user(user: schemas.UserCreate, event_time: datetime = None, db: Sessi
     )
 
 @router.post("/deactivate_user/", response_model=schemas.GlobalEventResponse)
-def deactivate_user(user: schemas.UserDeactivate, event_time: datetime = None, db: Session = Depends(get_db)):
-    if event_time is None:
-        event_time = datetime.utcnow()
-    
+def deactivate_user(user: schemas.UserDeactivate, db: Session = Depends(get_db)):
+    try:
+        # Parse and validate event_time
+        if isinstance(user.event_time, str):
+            event_time = parse(user.event_time)
+        elif user.event_time is None:
+            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+        elif isinstance(user.event_time, datetime):
+            event_time = user.event_time
+        else:
+            raise ValueError("event_time must be a datetime object or a valid datetime string")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
+
     # Determine if the identifier is an email or user_id
     if '@' in user.identifier:
         event_metadata = {
@@ -72,6 +93,7 @@ def deactivate_user(user: schemas.UserDeactivate, event_time: datetime = None, d
             "user_id": user.identifier
         }
 
+    # Create the new event
     new_event = models.GlobalEvent(
         event_time=event_time,
         event_type=models.EventType.user_deactivate_account,
@@ -80,16 +102,19 @@ def deactivate_user(user: schemas.UserDeactivate, event_time: datetime = None, d
     )
     db.add(new_event)
     
-    # Create partition if it doesn't exist
-    partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
-    db.execute(text(f"""
-    CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF global_events
-    FOR VALUES IN ('{new_event.partition_key}')
-    """))
-    
-    db.commit()
-    db.refresh(new_event)
-    
+    try:
+        # Partition name
+        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
+        # Call the utility function to check and create the partition
+        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+
+        db.commit()
+        db.refresh(new_event)
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to deactivate user: {e}")
+
     return schemas.GlobalEventResponse(
         event_id=new_event.event_id,
         event_time=new_event.event_time,

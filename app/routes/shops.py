@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import ProgrammingError
-from .. import models, schemas, database
 from datetime import datetime
 import uuid
+from dateutil.parser import parse
+import pytz
+from .. import models, schemas, database
 
 router = APIRouter()
 
@@ -17,15 +17,28 @@ def get_db():
         db.close()
 
 @router.post("/create_shop/", response_model=schemas.GlobalEventResponse)
-def create_shop(shop: schemas.ShopCreate, event_time: datetime = None, db: Session = Depends(get_db)):
+def create_shop(shop: schemas.ShopCreate, db: Session = Depends(get_db)):
     shop_id = str(uuid.uuid4())
-    if event_time is None:
-        event_time = datetime.utcnow()
+
+    try:
+        # Parse and validate event_time
+        if isinstance(shop.event_time, str):
+            event_time = parse(shop.event_time)
+        elif shop.event_time is None:
+            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+        elif isinstance(shop.event_time, datetime):
+            event_time = shop.event_time
+        else:
+            raise ValueError("event_time must be a datetime object or a valid datetime string")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
+
     event_metadata = {
         "shop_id": shop_id,
         "user_id": shop.user_id,
         "shop_name": shop.shop_name
     }
+
     new_event = models.GlobalEvent(
         event_time=event_time,
         event_type=models.EventType.user_shop_create,
@@ -34,20 +47,19 @@ def create_shop(shop: schemas.ShopCreate, event_time: datetime = None, db: Sessi
     )
     db.add(new_event)
     
-    # Create partition if it doesn't exist
-    partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
     try:
-        db.execute(text(f"""
-        CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF global_events
-        FOR VALUES IN ('{new_event.partition_key}')
-        """))
-        db.commit()  # Commit the transaction if the table creation is successful
-    except ProgrammingError as e:
-        db.rollback()  # Rollback if an error occurs to maintain database integrity
-        if "DuplicateTable" not in str(e.orig):
-            raise e  # Re-raise if the error is not a DuplicateTable error
+        # Partition name
+        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
+        
+        # Call the utility function to check and create the partition
+        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+        
+        db.commit()
+        db.refresh(new_event)
     
-    db.refresh(new_event)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create shop: {e}")
     
     return schemas.GlobalEventResponse(
         event_id=new_event.event_id,
@@ -56,15 +68,26 @@ def create_shop(shop: schemas.ShopCreate, event_time: datetime = None, db: Sessi
         event_metadata=new_event.event_metadata
     )
 
-
 @router.post("/delete_shop/", response_model=schemas.GlobalEventResponse)
-def delete_shop(shop: schemas.ShopDelete, event_time: datetime = None, db: Session = Depends(get_db)):
-    if event_time is None:
-        event_time = datetime.utcnow()
+def delete_shop(shop: schemas.ShopDelete, db: Session = Depends(get_db)):
+    try:
+        # Parse and validate event_time
+        if isinstance(shop.event_time, str):
+            event_time = parse(shop.event_time)
+        elif shop.event_time is None:
+            event_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+        elif isinstance(shop.event_time, datetime):
+            event_time = shop.event_time
+        else:
+            raise ValueError("event_time must be a datetime object or a valid datetime string")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
+
     event_metadata = {
         "shop_id": shop.shop_id,
         "user_id": shop.user_id
     }
+
     new_event = models.GlobalEvent(
         event_time=event_time,
         event_type=models.EventType.user_shop_delete,
@@ -73,20 +96,19 @@ def delete_shop(shop: schemas.ShopDelete, event_time: datetime = None, db: Sessi
     )
     db.add(new_event)
     
-    # Create partition if it doesn't exist
-    partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
     try:
-        db.execute(text(f"""
-        CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF global_events
-        FOR VALUES IN ('{new_event.partition_key}')
-        """))
-        db.commit()  # Commit the transaction if the table creation is successful
-    except ProgrammingError as e:
-        db.rollback()  # Rollback if an error occurs to maintain database integrity
-        if "DuplicateTable" not in str(e.orig):
-            raise e  # Re-raise if the error is not a DuplicateTable error
+        # Partition name
+        partition_name = f"global_events_{new_event.partition_key.replace('-', '_').replace(':', '_')}"
+        
+        # Call the utility function to check and create the partition
+        database.create_partition_if_not_exists(db, partition_name, new_event.partition_key)
+        
+        db.commit()
+        db.refresh(new_event)
     
-    db.refresh(new_event)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete shop: {e}")
     
     return schemas.GlobalEventResponse(
         event_id=new_event.event_id,

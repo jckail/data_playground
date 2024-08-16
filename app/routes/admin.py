@@ -1,17 +1,15 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
-from .. import database
+from .. import database, schemas  # Import the schemas module
 from ..utils.generate_fake_data import generate_fake_data
 from datetime import datetime, timedelta
-from pydantic import BaseModel
 import pytz
+
+from ..models import EventPropensity, FakeHelper
 
 router = APIRouter()
 
-class DateRange(BaseModel):
-    start_date: datetime
-    end_date: datetime
-
+# Dependency to get the database session
 def get_db():
     db = database.SessionLocal()
     try:
@@ -19,30 +17,72 @@ def get_db():
     finally:
         db.close()
 
+async def run_data_generation(
+    start_date: datetime, 
+    end_date: datetime, 
+    max_fake_users_per_day: int, 
+    max_user_churn: float, 
+    max_first_shop_creation_percentage : float, 
+    max_multiple_shop_creation_percentage : float, 
+    max_shop_churn: float,
+    semaphore: int = 10
+):
+    
+    ep = EventPropensity(
+        max_fake_users_per_day,
+        max_user_churn,
+        max_first_shop_creation_percentage,
+        max_multiple_shop_creation_percentage,
+        max_shop_churn
+    )
+    fh = FakeHelper(semaphore=semaphore)
 
-def get_yesterday():
-    return datetime.now(pytz.utc).date() - timedelta(days=1)
 
+    summary_dict = await generate_fake_data(
+        start_date, 
+        end_date, 
+        ep, 
+        fh
+    )
+    
+    if summary_dict is None:
+        raise HTTPException(
+            status_code=500, 
+            detail="Data generation failed: No data was returned from generate_fake_data"
+        )
 
-async def run_data_generation(db: Session, start_date: datetime, end_date: datetime):
-    result = await generate_fake_data( start_date, end_date)
-    print(f"Data generation complete. Results: {result}")
-
-
+    print(f"Data generation complete. Summary: {summary_dict}")
+    
+    return summary_dict
 
 @router.post("/generate_fake_data")
-async def trigger_fake_data_generation(date_range: DateRange, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    yesterday = get_yesterday()
+async def trigger_fake_data_generation(
+    fdq: schemas.FakeDataQuery,  # Use the schema defined in schemas.py
+    background_tasks: BackgroundTasks, 
+    db: Session = Depends(get_db)
+):
+    yesterday = datetime.now(pytz.utc).date() - timedelta(days=1)
     
-    if date_range.start_date.date() > yesterday:
+    if fdq.start_date.date() > yesterday:
         raise HTTPException(status_code=400, detail="Start date cannot be later than yesterday")
     
-    end_date = datetime.combine(yesterday, datetime.max.time()).replace(tzinfo=pytz.UTC)
-    start_date = date_range.start_date.replace(tzinfo=pytz.UTC)
+    try:
+        result_summary = await run_data_generation(
+
+            fdq.start_date,
+            fdq.end_date,
+            fdq.max_fake_users_per_day,
+            fdq.max_user_churn,
+            fdq.max_first_shop_creation_percentage,
+            fdq.max_multiple_shop_creation_percentage,
+            fdq.max_shop_churn,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Data generation failed: {e}")
     
-    background_tasks.add_task(run_data_generation, db, start_date, end_date)
     return {
-        "message": "Fake data generation started in the background",
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat()
+        "message": "Fake data generation completed",
+        "start_date": fdq.start_date.isoformat(),
+        "end_date": fdq.end_date.isoformat(),
+        "summary": result_summary,
     }
