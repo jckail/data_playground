@@ -6,6 +6,8 @@ from datetime import datetime
 
 class Shop(Base, PartitionedModel):
     __tablename__ = 'shops'
+    __partitiontype__ = "daily"
+    __partition_field__ = "event_time"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     shop_owner_id = Column(UUID(as_uuid=True), nullable=False)
@@ -15,10 +17,4 @@ class Shop(Base, PartitionedModel):
     deactivated_time = Column(DateTime(timezone=True))
     event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ['shop_owner_id', 'partition_key'],
-            ['users.id', 'users.partition_key']
-        ),
-        {'postgresql_partition_by': 'RANGE (partition_key)'},
-    )
+    __table_args__ = {'postgresql_partition_by': 'RANGE (partition_key)'}

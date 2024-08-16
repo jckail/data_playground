@@ -30,10 +30,27 @@ config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+def exclude_partitions(autogen_context, tablename):
+    def include_object(object, name, type_, reflected, compare_to):
+        if type_ == "table" and name.startswith(f"{tablename}_p_"):
+            return False
+        return True
+    return include_object
+
+class PartitionedTableComparator:
+    def __init__(self, autogen_context, partition_tables):
+        self.autogen_context = autogen_context
+        self.partition_tables = partition_tables
+
+    def render_item(self, type_, obj, autogen_context):
+        if type_ == "table" and obj.name in self.partition_tables:
+            return None
+        return False
+
+def include_object(object, name, type_, reflected, compare_to):
+    if type_ == "table":
+        return not (name.startswith("global_events_p_") or name.startswith("shops_p_"))
+    return True
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -43,6 +60,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -59,7 +77,12 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(
             connection=connection, 
-            target_metadata=target_metadata
+            target_metadata=target_metadata,
+            include_object=include_object,
+            compare_type=True,
+            compare_server_default=True,
+            include_schemas=True,
+            render_item=PartitionedTableComparator(context, ["global_events", "shops"]).render_item,
         )
 
         with context.begin_transaction():
