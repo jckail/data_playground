@@ -14,7 +14,7 @@ class User(Base, PartitionedModel):
     email = Column(String(255), nullable=False)
     status = Column(Boolean, nullable=False, default=True)
     created_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    deactivated_time = Column(DateTime(timezone=True))
-    partition_key = Column(Date, primary_key=True, nullable=False, default=lambda: datetime.utcnow().date())
+    deactivated_time = Column(DateTime(timezone=True), nullable=True, default=datetime.utcnow)
+    event_time = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     
     __table_args__ = {'postgresql_partition_by': 'RANGE (partition_key)'}

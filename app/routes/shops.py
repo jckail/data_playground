@@ -12,7 +12,7 @@ router = APIRouter()
 def create_shop(shop: schemas.ShopCreate, db: Session = Depends(database.get_db)):
     event_metadata = {
         "shop_id": str(uuid.uuid4()),
-        "owner_user_id": str(shop.user_id),
+        "shop_owner_id": str(shop.shop_owner_id),
         "shop_name": shop.shop_name
     }
 
@@ -29,7 +29,7 @@ def create_shop(shop: schemas.ShopCreate, db: Session = Depends(database.get_db)
 def delete_shop(shop: schemas.ShopDelete, db: Session = Depends(database.get_db)):
     event_metadata = {
         "shop_id": str(shop.shop_id),
-        "owner_user_id": str(shop.user_id) if shop.user_id else None
+        "shop_owner_id": str(shop.shop_owner_id) if shop.shop_owner_id else None
     }
 
     new_event = models.GlobalEvent.create_with_partition(

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 class ShopCreate(BaseModel):
-    user_id: UUID4
+    shop_owner_id: UUID4
     shop_name: str
     event_time: Optional[datetime] = None
 
@@ -21,8 +21,16 @@ class ShopResponse(BaseModel):
 
 class ShopDelete(BaseModel):
     shop_id: UUID4
-    user_id: Optional[UUID4] = None
+    shop_owner_id: Optional[UUID4] = None
     event_time: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+class ShopSnapshot(BaseModel):
+    event_time: Optional[datetime] = None
+
+class ShopSnapshotResponse(BaseModel):
+    event_time: datetime
+    event_type: str
+    event_metadata: dict

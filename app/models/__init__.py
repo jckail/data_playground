@@ -1,4 +1,4 @@
-from .base import Base, PartitionedModel
+from .base import Base, PartitionedModel, generate_partition_name
 from .user import User
 from .shop import Shop
 from .invoice import UserInvoice
@@ -7,7 +7,7 @@ from .global_event import GlobalEvent, EventType
 import asyncio
 # Export all models
 __all__ = [
-    "Base", "PartitionedModel",
+    "Base", "PartitionedModel", "generate_partition_name",
     "User", "Shop", "UserInvoice", "Payment",
     "GlobalEvent", "EventType"
 ]

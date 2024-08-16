@@ -1,5 +1,6 @@
 import asyncio
 import httpx
+import random
 from datetime import datetime, timedelta
 
 from ..models import EventPropensity, FakeHelper
@@ -75,9 +76,12 @@ async def handle_users(client, current_date, ep:EventPropensity, fh: FakeHelper)
         #     fh.shops,
         #     int(len(fh.shops) * random.uniform(0, ep.max_shop_creation_percentage)),
         # )
+        
+        
+        users_to_generate = int(random.uniform(0, ep.max_fake_users_per_day))
+        print(ep.max_user_churn, users_to_generate)
 
-
-        tasks = [create_fake_user(client, current_date, fh) for _ in range(ep.max_fake_users_per_day)]
+        tasks = [create_fake_user(client, current_date, fh) for _ in range(users_to_generate)]
         todays_users = await process_tasks(client, tasks)
         fh.daily_users_created = len(todays_users)
 

@@ -6,10 +6,10 @@ import pytz
 class FakeDataQuery(BaseModel):
     start_date: datetime = Field(default_factory=lambda: (datetime.now(pytz.utc) - timedelta(days=14)).replace(hour=0, minute=0, second=0, microsecond=0))
     end_date: datetime = Field(default_factory=lambda: (datetime.now(pytz.utc) - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999))
-    max_fake_users_per_day: Optional[int] = 1000
-    max_user_churn: Optional[float] = 0.1
-    max_first_shop_creation_percentage: Optional[float] = 0.9
-    max_multiple_shop_creation_percentage: Optional[float] = 0.2
+    max_fake_users_per_day: Optional[int] = 5000
+    max_user_churn: Optional[float] = 0.2
+    max_first_shop_creation_percentage: Optional[float] = 0.6
+    max_multiple_shop_creation_percentage: Optional[float] = 0.1
     max_shop_churn: Optional[float] = 0.2
 
     class Config:

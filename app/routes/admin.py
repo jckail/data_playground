@@ -1,27 +1,33 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
-from .. import models, schemas, database
 from ..utils.generate_fake_data import generate_fake_data
 from datetime import datetime, timedelta, date
 import pytz
 from sqlalchemy import text
-from dateutil.parser import parse
-from ..models import EventPropensity, FakeHelper
-import logging
+import httpx
+from ..models import EventPropensity, FakeHelper, User, Shop
 import time
+from ..schemas import FakeDataQuery, UserSnapshot, UserSnapshotResponse, ShopSnapshot , ShopSnapshotResponse
+
+from ..database import get_db
+
+from app.utils.helpers import post_request, BASE_URL
 
 
 router = APIRouter()
 
 
-# Dependency to get the database session
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
+async def run_rollup(current_date, endpoint):
+    event_time = current_date.isoformat()
+    payload = {"event_time": current_date.isoformat()}
+    url = f"{BASE_URL}/admin/{endpoint}"
+    async with httpx.AsyncClient() as client:
+        return await post_request(
+            client,
+            url,
+            payload,
+        f"Failed to run  {url} @ {event_time}",
+    )
 
 async def run_data_generation(
     start_date: datetime,
@@ -49,6 +55,7 @@ async def run_data_generation(
     for i in range((end_date - start_date).days + 1):
         current_date = start_date + timedelta(days=i)
         z = await generate_fake_data(current_date, z, ep, fh)
+        await run_rollup(current_date, "user_snapshot")
 
 
     # Calculate the total runtime
@@ -81,7 +88,7 @@ async def run_data_generation(
 
 @router.post("/generate_fake_data")
 async def trigger_fake_data_generation(
-    fdq: schemas.FakeDataQuery,  # Use the schema defined in schemas.py
+    fdq: FakeDataQuery,  # Use the schema defined in schemas.py
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
@@ -122,9 +129,9 @@ async def trigger_fake_data_generation(
 ## and "Generate partition keysSSSS if not exists
 
 
-@router.post("/user_snapshot", response_model=schemas.UserSnapshotResponse)
+@router.post("/user_snapshot", response_model=UserSnapshotResponse)
 def user_snapshot(
-    snapshot: schemas.UserSnapshot, db: Session = Depends(get_db)
+    snapshot: UserSnapshot, db: Session = Depends(get_db)
 ):
     try:
         # Use the event_time from the schema, or default to current time
@@ -136,38 +143,154 @@ def user_snapshot(
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
-        # Paths: 
-        # format: yyyy-mm-dd
-        # Timestamp
-        # Date --> STR
 
-
-        # Debugging: Ensure these are date objects
         print(f"partition_key: {partition_key}, type: {type(partition_key)}")
         print(f"previous_day: {previous_day}, type: {type(previous_day)}")
 
+        query = text(
+                """
+                
+                WITH base AS (
+                    SELECT 
+                        event_metadata->>'user_id' AS id,
+                        event_metadata->>'email' AS email,
+                        event_time as created_time,
+                        NULL as deactivated_time     
+                    FROM global_events
+                    WHERE event_type = 'user_shop_create'
+                    AND event_time::date = :partition_key
+                    
+                    UNION ALL 
+                    
+                    SELECT 
+                        event_metadata->>'user_id' AS id,
+                        event_metadata->>'email' AS email,
+                        NULL as created_time,
+                        event_time as deactivated_time     
+                    FROM global_events
+                    WHERE event_type = 'user_shop_delete'
+                    AND event_time::date = :partition_key
+                    
+                    UNION ALL 
+                    
+                    SELECT 
+                        id::text,
+                        email,
+                        created_time,
+                        deactivated_time    
+                    FROM users
+                    WHERE partition_key = :previous_day
+
+                    UNION ALL 
+                    
+                    SELECT 
+                        id::text,
+                        email,
+                        created_time,
+                        deactivated_time    
+                    FROM users
+                    WHERE partition_key = :partition_key
+                ),
+                base2 AS (
+                    SELECT 
+                        id,
+                        email,
+                        MAX(created_time) AS created_time,
+                        MAX(deactivated_time) AS deactivated_time   
+                    FROM base
+                    where id is not null
+                    and email is not null
+
+                    GROUP BY id, email  
+                )
+                SELECT 
+                    DISTINCT 
+                    id::uuid,
+                    email,
+                    CASE WHEN deactivated_time IS NULL THEN TRUE ELSE FALSE END AS status,
+                    created_time,
+                    deactivated_time,
+                    :partition_key partition_key
+                FROM base2
+                """
+            )
+        update_query = text("""
+            INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key, event_time)
+            VALUES (:id, :email, :status, :created_time, :deactivated_time, :partition_key, :event_time)
+            ON CONFLICT (id, partition_key)
+            DO UPDATE SET
+                email = EXCLUDED.email,
+                status = EXCLUDED.status,
+                created_time = COALESCE(users.created_time, EXCLUDED.created_time),
+                deactivated_time = COALESCE(EXCLUDED.deactivated_time, users.deactivated_time),
+                event_time = EXCLUDED.event_time
+            RETURNING id
+        """)
+
+
+        res = db.execute(
+            query,
+            {
+                
+                "previous_day": previous_day,
+                "partition_key": partition_key,
+            }
+            
+        )
 
 
 
 
-        # Process user creation and deletion events
-        process_user_events(db, partition_key, previous_day)
+
+        rows = res.fetchall()
+        print(f"Fetched {len(rows)} rows")
+
+        for i, row in enumerate(rows):
+            # Check if the record already exists
+            existing_record = db.query(User).filter(User.id == row.id).first()
+
+            new_record = User.validate_partition(
+                db=db,
+                id=row.id,
+                email=row.email,
+                status=row.status,
+                created_time=row.created_time,
+                deactivated_time=row.deactivated_time,
+                event_time=event_time,
+            )
+
+            if existing_record:
+                # Update existing record
+                res = db.execute(
+                    update_query,
+                    {
+                        "id": new_record.id,
+                        "email": new_record.email,
+                        "status": new_record.status,
+                        "created_time": new_record.created_time,
+                        "deactivated_time": new_record.deactivated_time,
+                        "partition_key": new_record.partition_key,
+                        "event_time": new_record.event_time, 
+                    }
+                    
+                )
+
+            else:
+                # Create new record
+                db.add(new_record)
+
         db.commit()
-        # Commit the transaction to ensure data is saved
-        
 
         # Return the response after processing
         users_processed = get_users_processed_count(db, partition_key)
-        db.commit()
         
-        return schemas.UserSnapshotResponse(
+        return UserSnapshotResponse(
             event_time=event_time,
             event_type="user_snapshot",
-            event_metadata={
-                "snapshot_date": str(partition_key),
-                "users_processed": users_processed,
-            },
+            event_metadata={"users_processed": users_processed},
         )
+        
+
 
     except Exception as e:
         db.rollback()
@@ -177,79 +300,7 @@ def user_snapshot(
 
 
 
-def process_user_events(db: Session, partition_key: date, previous_day: date):
-    # Query and process creation events
-    get_user_events(
-        db, partition_key, previous_day
-    )
 
-
-
-def get_user_events(db: Session, partition_key: str, previous_day: str):
-
-
-    query = text(
-        """
-        INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key)
-        WITH base AS (
-            SELECT 
-                event_metadata->>'user_id' AS id,
-                event_metadata->>'email' AS email,
-                event_time as created_time,
-                NULL as deactivated_time     
-            FROM global_events
-            WHERE event_type = 'user_account_creation'
-            AND event_time::date = :partition_key
-            
-            UNION ALL 
-            
-            SELECT 
-                event_metadata->>'user_id' AS id,
-                event_metadata->>'email' AS email,
-                NULL as created_time,
-                event_time as deactivated_time     
-            FROM global_events
-            WHERE event_type = 'user_deactivate_account'
-            AND event_time::date = :partition_key
-            
-            UNION ALL 
-            
-            SELECT 
-                id::text,
-                email,
-                created_time,
-                deactivated_time    
-            FROM users
-            WHERE partition_key = :previous_day
-        ),
-        base2 AS (
-            SELECT 
-                id,
-                email,
-                MAX(created_time) AS created_time,
-                MAX(deactivated_time) AS deactivated_time   
-            FROM base
-            GROUP BY id, email
-        )
-        SELECT 
-            DISTINCT 
-            id::uuid,
-            email,
-            CASE WHEN deactivated_time IS NULL THEN TRUE ELSE FALSE END AS status,
-            created_time,
-            deactivated_time,
-            :partition_key partition_key
-        FROM base2
-        """
-    )
-    db.execute(
-        query,
-        {
-            
-            "previous_day": previous_day,
-            "partition_key": partition_key,
-        }
-    )
 
 def get_users_processed_count(db: Session, partition_key: date) -> int:
     result = db.execute(
@@ -257,3 +308,4 @@ def get_users_processed_count(db: Session, partition_key: date) -> int:
         {"partition_key": partition_key},
     ).scalar()
     return result
+

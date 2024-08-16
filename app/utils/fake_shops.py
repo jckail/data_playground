@@ -19,9 +19,9 @@ import time
 
 
 class Shop:
-    def __init__(self, id, owner_id, event_time=None, shop_name=None):
+    def __init__(self, id, shop_owner_id, event_time=None, shop_name=None):
         self.id = id
-        self.owner_id = owner_id
+        self.shop_owner_id = shop_owner_id
         self.event_time = event_time
         self.shop_name = shop_name
 
@@ -53,7 +53,7 @@ def shop_from_response(shops):
             valid_shops.append(
                 Shop(
                     shop["event_metadata"]["shop_id"],
-                    shop["event_metadata"]["user_id"],
+                    shop["event_metadata"]["shop_owner_id"],
                     shop["event_time"],
                     shop["event_metadata"].get(
                         "shop_name", None
@@ -67,11 +67,11 @@ def shop_from_response(shops):
     return valid_shops
 
 
-async def create_fake_shop(client, user_id, current_date):
+async def create_fake_shop(client, shop_owner_id, current_date):
     try:
         event_time = await generate_event_time(current_date)
         payload = {
-            "user_id": user_id,
+            "shop_owner_id": shop_owner_id,
             "shop_name": fake.company(),
             "event_time": event_time,
         }
@@ -80,7 +80,7 @@ async def create_fake_shop(client, user_id, current_date):
             client,
             url,
             payload,
-            f"Failed to create shop for user {user_id} at {event_time}",
+            f"Failed to create shop for user {shop_owner_id} at {event_time}",
         )
     except Exception as e:
         logger.error(f"Error creating shop: {e}")
@@ -91,10 +91,10 @@ async def generate_shops(
     client, current_date, user_list, propensity, exclusion=[]
 ):
 
-    user_list = [user_id for user_id in user_list if user_id not in exclusion]
+    user_list = [shop_owner_id for shop_owner_id in user_list if shop_owner_id not in exclusion]
 
     tasks = [
-        create_fake_shop(client, user_id, current_date) for user_id in sampler(user_list, propensity,True)
+        create_fake_shop(client, shop_owner_id, current_date) for shop_owner_id in sampler(user_list, propensity,True)
     ]
     return await process_tasks(client, tasks)
 
@@ -106,7 +106,7 @@ async def handle_shops(client, current_date, ep, fh: FakeHelper):
             user.id for user in fh.users
         ]  # Get the IDs of the active users
 
-        existing_shop_owners = [shop.owner_id for shop in fh.shops]
+        existing_shop_owners = [shop.shop_owner_id for shop in fh.shops]
 
         # cleanup_shops
         
@@ -121,7 +121,7 @@ async def handle_shops(client, current_date, ep, fh: FakeHelper):
         fh.shops.extend(shop_from_response(todays_first_shops))
 
         # Addtional Shops
-        existing_shop_owners = [shop.owner_id for shop in fh.shops]
+        existing_shop_owners = [shop.shop_owner_id for shop in fh.shops]
         todays_next_shops = await generate_shops(
             client,
             current_date,
@@ -135,7 +135,7 @@ async def handle_shops(client, current_date, ep, fh: FakeHelper):
             todays_first_shops
         ))
 
-        del_user_shops = [shop for shop in fh.shops if shop.owner_id not in active_users]
+        del_user_shops = [shop for shop in fh.shops if shop.shop_owner_id not in active_users]
         
 
         del_queue = del_user_shops + sampler(fh.shops, ep.max_shop_churn,True)
