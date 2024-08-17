@@ -28,6 +28,8 @@ class PartitionedModel:
             partition_key = event_time.strftime("%Y-%m-%dT%H:00:00")
             #next_partition = (event_time + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00:00")
             partition_name = generate_partition_name(self.__tablename__, partition_key.replace(':', '_'))
+            print(f"Creating partition {partition_name} for {self.__tablename__} with partition key {partition_key}")
+            
             db.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
                 FOR VALUES IN ('{partition_key}')

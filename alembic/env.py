@@ -49,7 +49,7 @@ class PartitionedTableComparator:
 
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == "table":
-        return not (name.startswith("global_events_p_") or name.startswith("shops_p_")or name.startswith("users_p_")or name.contains("_p_"))
+        return not (name.startswith("global_events_p_") or name.startswith("shops_p_")or name.startswith("users_p_")or "_p_" in name)
     return True
 
 def run_migrations_offline() -> None:
