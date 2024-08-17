@@ -8,6 +8,10 @@ from dateutil.parser import parse
 from fastapi import HTTPException
 import psycopg2
 import psycopg2.extras
+import logging
+
+logger = logging.getLogger("request_response_logger")
+logging.basicConfig(level=logging.INFO)
 
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",

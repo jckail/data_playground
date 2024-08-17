@@ -4,12 +4,14 @@ from .shop import Shop
 from .invoice import UserInvoice
 from .payment import Payment
 from .global_event import GlobalEvent, EventType
+from .RequestResponseLog import RequestResponseLog
 import asyncio
 # Export all models
 __all__ = [
     "Base", "PartitionedModel", "generate_partition_name",
     "User", "Shop", "UserInvoice", "Payment",
-    "GlobalEvent", "EventType"
+    "GlobalEvent", "EventType",
+    "RequestResponseLog",
 ]
 
 

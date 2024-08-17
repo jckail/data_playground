@@ -12,13 +12,13 @@ from typing import List
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 fake = Faker()
 BASE_URL = "http://localhost:8000"  # Adjust if your API is hosted elsewhere
 
-
 async def generate_event_time(current_date, day_start=None):
     try:
+        logger.debug(f"Generating event time for date {current_date} with day_start {day_start}")
+
         # Convert day_start to datetime if it's a string
         if isinstance(day_start, str):
             day_start = parse(day_start)
@@ -37,69 +37,72 @@ async def generate_event_time(current_date, day_start=None):
         day_end = datetime.combine(current_date, datetime.max.time()).replace(
             tzinfo=pytz.UTC
         )
-        return fake.date_time_between(
+        event_time = fake.date_time_between(
             start_date=day_start, end_date=day_end, tzinfo=pytz.UTC
         ).isoformat()
+
+        logger.debug(f"Generated event time: {event_time}")
+        return event_time
     except Exception as e:
         logger.error(
-            f"Error generating event time: {e}, {day_start}, {type(day_start)}"
+            f"Error generating event time: {e}, day_start={day_start}, type={type(day_start)}"
         )
         raise
 
-
-
-
-
 async def process_tasks(client, tasks):
     try:
+        logger.info(f"Processing {len(tasks)} tasks")
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"Task failed with exception: {result}")
-        return [
-            result for result in results if not isinstance(result, Exception)
-        ]
+        successful_results = [result for result in results if not isinstance(result, Exception)]
+        logger.info(f"Successfully processed {len(successful_results)}/{len(tasks)} tasks")
+        return successful_results
     except Exception as e:
         logger.error(f"Error processing tasks: {e}")
         raise
 
-
-async def post_request(
-    client, url, payload, error_message, semaphore=None, retries=3
-):
-    async with semaphore or asyncio.Semaphore(1):
-        for attempt in range(retries):
-            try:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                if 500 <= e.response.status_code < 600:
-                    logger.warning(
-                        f"Server error ({e.response.status_code}): {e}. Retrying..."
-                    )
-                    continue  # Retry on server errors
-                else:
-                    logger.error(f"{error_message}: {e}")
-                    return None
-            except httpx.RequestError as e:
-                logger.error(f"Request failed: {e}. Retrying...")
-                continue  # Retry on connection errors
-            except Exception as e:
-                logger.error(f"{error_message}: {e}")
+async def post_request(client, url, payload, error_message, semaphore=None):
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(50)  # Default value if semaphore is not provided
+    
+    async with semaphore:
+        try:
+            logger.debug(f"Sending POST request to {url} with payload: {payload}")
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            logger.debug(f"Received response: {response.json()}")
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if 500 <= e.response.status_code < 600:
+                logger.warning(
+                    f"Server error ({e.response.status_code}): {e}. Retrying..."
+                )
+                await asyncio.sleep(1)  # Optional: Add a delay between retries
+            else:
+                logger.error(f"{error_message}: HTTP error {e.response.status_code}: {e}")
                 return None
-        logger.error(f"Failed after {retries} retries for url: {url}")
-        return None
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}. Retrying...")
+            await asyncio.sleep(1)  # Optional: Add a delay between retries
+        except Exception as e:
+            logger.error(f"{error_message}: Unexpected error: {e}")
+            return None
 
 
+def sampler(population: List, propensity, r=False) -> List:
+    try:
+        logger.debug(f"Sampling from population of size {len(population)} with propensity {propensity}, randomize: {r}")
+        random.shuffle(population)
 
-def sampler(population:List, propensity, r= False) -> List:
-    random.shuffle(population)
+        if r:
+            propensity = random.uniform(0, propensity)
 
-    if r:
-        propensity = random.uniform(0, propensity)
-
-    return      random.sample(
-        population,
-        int(len(population) * propensity),
-    )
+        sample_size = int(len(population) * propensity)
+        sampled_list = random.sample(population, sample_size)
+        logger.debug(f"Sampled {len(sampled_list)} items from population")
+        return sampled_list
+    except Exception as e:
+        logger.error(f"Error in sampling: {e}")
+        raise
