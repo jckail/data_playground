@@ -4,6 +4,7 @@ services:
     build: .
     ports:
       - "8000:8000"
+      - "8501:8501"
     depends_on:
       db:
         condition: service_healthy
@@ -14,6 +15,7 @@ services:
       - ./app:/code/app
       - ./alembic:/code/alembic
       - ./alembic.ini:/code/alembic.ini
+      - ./streamlit_app.py:/code/streamlit_app.py
 
   db:
     image: postgres:13

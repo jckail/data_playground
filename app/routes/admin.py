@@ -145,9 +145,6 @@ def user_snapshot(
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
-        print(f"partition_key: {partition_key}, type: {type(partition_key)}")
-        print(f"previous_day: {previous_day}, type: {type(previous_day)}")
-
         query = f"""
             WITH base AS (
                 SELECT 
