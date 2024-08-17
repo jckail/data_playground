@@ -20,7 +20,7 @@ SQLALCHEMY_DATABASE_URL = os.getenv(
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,    
-    pool_size=50,
+    pool_size=250,
     max_overflow=20,
     pool_timeout=30,
     pool_recycle=1800,

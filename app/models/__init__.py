@@ -37,7 +37,7 @@ class FakeHelper:
         daily_users_deactivated=0,
         daily_shops_created=0,
         daily_shops_deleted=0,
-        semaphore=10,
+        semaphore=250,
         users=None,
         shops=None,
     ):

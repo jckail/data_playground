@@ -65,7 +65,7 @@ async def process_tasks(client, tasks):
 
 async def post_request(client, url, payload, error_message, semaphore=None):
     if semaphore is None:
-        semaphore = asyncio.Semaphore(50)  # Default value if semaphore is not provided
+        semaphore = asyncio.Semaphore(250)  # Default value if semaphore is not provided
     
     async with semaphore:
         try:
@@ -77,15 +77,13 @@ async def post_request(client, url, payload, error_message, semaphore=None):
         except httpx.HTTPStatusError as e:
             if 500 <= e.response.status_code < 600:
                 logger.warning(
-                    f"Server error ({e.response.status_code}): {e}. Retrying..."
+                    f"Server error ({e.response.status_code}): {e}. ."
                 )
-                await asyncio.sleep(1)  # Optional: Add a delay between retries
             else:
                 logger.error(f"{error_message}: HTTP error {e.response.status_code}: {e}")
                 return None
         except httpx.RequestError as e:
-            logger.error(f"Request error: {e}. Retrying...")
-            await asyncio.sleep(1)  # Optional: Add a delay between retries
+            logger.error(f"Request error: {e}. ")
         except Exception as e:
             logger.error(f"{error_message}: Unexpected error: {e}")
             return None

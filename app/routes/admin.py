@@ -94,7 +94,7 @@ async def run_data_generation(
     max_first_shop_creation_percentage: float,
     max_multiple_shop_creation_percentage: float,
     max_shop_churn: float,
-    semaphore: int = 50,
+    semaphore: int = 250,
 ):
     logger.info(f"Starting data generation from {start_date} to {end_date} with max_fake_users_per_day={max_fake_users_per_day}")
 

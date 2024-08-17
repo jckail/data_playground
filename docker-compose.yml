@@ -11,6 +11,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:password@db/dbname
       - PYTHONPATH=/code
+      - POOL_SIZE=250
+      - MAX_OVERFLOW=50
+      - POOL_TIMEOUT=30
+      - POOL_RECYCLE=1800
     volumes:
       - ./app:/code/app
       - ./alembic:/code/alembic
@@ -19,6 +23,7 @@ services:
 
   db:
     image: postgres:13
+    command: -c 'max_connections=500'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:

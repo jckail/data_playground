@@ -3,8 +3,8 @@ import psycopg
 import sys
 
 def wait_for_db():
-    max_retries = 30
-    retry_interval = 2
+    max_retries = 3
+    retry_interval = 1
     connection_string = "postgresql://user:password@db/dbname"
 
     for attempt in range(max_retries):
