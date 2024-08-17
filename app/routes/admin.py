@@ -7,27 +7,84 @@ from sqlalchemy import text
 import httpx
 from ..models import EventPropensity, FakeHelper, User, Shop
 import time
-from ..schemas import FakeDataQuery, UserSnapshot, UserSnapshotResponse, ShopSnapshot , ShopSnapshotResponse
-
+from ..schemas import FakeDataQuery, UserSnapshot, UserSnapshotResponse, ShopSnapshot, ShopSnapshotResponse
 from ..database import get_db
-
 from app.utils.helpers import post_request, BASE_URL
+import logging
 
+# Set up the logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 router = APIRouter()
-
 
 async def run_rollup(current_date, endpoint):
     event_time = current_date.isoformat()
     payload = {"event_time": current_date.isoformat()}
     url = f"{BASE_URL}/admin/{endpoint}"
-    async with httpx.AsyncClient() as client:
-        return await post_request(
-            client,
-            url,
-            payload,
-        f"Failed to run  {url} @ {event_time}",
-    )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await post_request(
+                client,
+                url,
+                payload,
+                f"Failed to run  {url} @ {event_time}",
+            )
+        logger.info(f"Rollup for {endpoint} completed successfully at {event_time}")
+        return response
+    except Exception as e:
+        logger.error(f"Error during rollup for {endpoint} at {event_time}: {str(e)}")
+        raise
+
+@router.post("/create_rollups")
+async def create_rollups(
+    background_tasks: BackgroundTasks, 
+    start_date: datetime = None, 
+    end_date: datetime = None, 
+    db: Session = Depends(get_db)
+):
+    try:
+        dates = []
+        
+        # If both start_date and end_date are not provided, query all possible dates
+        if start_date is None or end_date is None:
+            logger.info("No start_date or end_date provided. Fetching all possible dates from global_events.")
+            date_query = text("""
+                SELECT DISTINCT date(event_time) AS event_date
+                FROM global_events
+                ORDER BY event_date
+            """)
+            result = db.execute(date_query)
+            dates = [row.event_date for row in result.fetchall()]
+            
+            if not dates:
+                raise HTTPException(status_code=404, detail="No dates found in global_events")
+            
+            if not start_date:
+                start_date = dates[0]
+            if not end_date:
+                end_date = dates[-1]
+            logger.info(f"Processing rollups for dates from {start_date} to {end_date}")
+
+        # If either start_date or end_date is provided, or we have fetched the dates
+        if start_date is not None and end_date is not None:
+            if not dates:
+                dates = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+        
+        for current_date in dates:
+            background_tasks.add_task(run_rollup, current_date, "user_snapshot")
+            background_tasks.add_task(run_rollup, current_date, "shop_snapshot")
+
+        return {"message": f"Rollups creation tasks have been initiated between {start_date} and {end_date}"}
+    
+    except Exception as e:
+        logger.error(f"Failed to create rollups: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create rollups: {str(e)}")
+
+
+
+
 
 async def run_data_generation(
     start_date: datetime,
@@ -39,6 +96,7 @@ async def run_data_generation(
     max_shop_churn: float,
     semaphore: int = 20,
 ):
+    logger.info(f"Starting data generation from {start_date} to {end_date} with max_fake_users_per_day={max_fake_users_per_day}")
 
     ep = EventPropensity(
         max_fake_users_per_day,
@@ -48,45 +106,59 @@ async def run_data_generation(
         max_shop_churn,
     )
     fh = FakeHelper(semaphore=semaphore)
-
     z = {}
-
     start_time = time.time()
-    for i in range((end_date - start_date).days + 1):
-        current_date = start_date + timedelta(days=i)
-        z = await generate_fake_data(current_date, z, ep, fh)
-        await run_rollup(current_date, "user_snapshot")
-        await run_rollup(current_date, "shop_snapshot")
 
+    # Initialize totals
+    total_users_created = 0
+    total_users_deactivated = 0
+    total_shops_created = 0
+    total_shops_deleted = 0
+
+    try:
+        for i in range((end_date - start_date).days + 1):
+            current_date = start_date + timedelta(days=i)
+            logger.debug(f"Generating fake data for {current_date}")
+
+            # Reset daily counts
+            fh.reset_daily_counts()
+
+            # Run the daily data generation process
+            z[current_date] = await generate_fake_data(current_date, z, ep, fh)
+
+            # Accumulate daily totals into the overall totals
+            total_users_created += fh.daily_users_created
+            total_users_deactivated += fh.daily_users_deactivated
+            total_shops_created += fh.daily_shops_created
+            total_shops_deleted += fh.daily_shops_deleted
+
+            logger.debug(f"Day {current_date}: Users Created = {fh.daily_users_created}, Users Deactivated = {fh.daily_users_deactivated}, Shops Created = {fh.daily_shops_created}, Shops Deleted = {fh.daily_shops_deleted}")
+
+    except Exception as e:
+        logger.error(f"Error during data generation: {str(e)}")
+        raise
 
     # Calculate the total runtime
     end_time = time.time()
     run_time = end_time - start_time
 
-    #@TODO: FIX SUMMARY DICT the counts are wrong!
+    # Create the final summary
     summary_dict = {
-            "total_users_created": sum(z[current_date].daily_users_created for current_date in z),
-            "total_users_deactivated": sum(z[current_date].daily_users_deactivated for current_date in z),
-            "total_active_users": len(fh.users),
-            "total_shops_created": sum(z[current_date].daily_shops_created for current_date in z),
-            "total_shops_deleted": sum(z[current_date].daily_shops_deleted for current_date in z),
-            "total_active_shops": len(fh.shops),
-            "total_days": (end_date - start_date).days + 1,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "run_time": round(run_time,4),
-        }
+        "total_users_created": total_users_created,
+        "total_users_deactivated": total_users_deactivated,
+        "total_active_users": len(fh.users),  # Active users left in the system
+        "total_shops_created": total_shops_created,
+        "total_shops_deleted": total_shops_deleted,
+        "total_active_shops": len(fh.shops),  # Active shops left in the system
+        "total_days": (end_date - start_date).days + 1,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "run_time": round(run_time, 4),
+    }
 
-    if summary_dict is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Data generation failed: No data was returned from generate_fake_data",
-        )
-
-    print(f"Data generation complete. Summary: {summary_dict}")
+    logger.info(f"Data generation complete. Summary: {summary_dict}")
 
     return summary_dict
-
 
 @router.post("/generate_fake_data")
 async def trigger_fake_data_generation(
@@ -94,9 +166,12 @@ async def trigger_fake_data_generation(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    logger.info(f"Triggering fake data generation for date range {fdq.start_date} to {fdq.end_date}")
+
     yesterday = datetime.now(pytz.utc).date() - timedelta(minutes=1)
 
     if fdq.start_date.date() > yesterday:
+        logger.warning(f"Start date {fdq.start_date} cannot be later than yesterday {yesterday}")
         raise HTTPException(
             status_code=400, detail="Start date cannot be later than yesterday"
         )
@@ -112,10 +187,13 @@ async def trigger_fake_data_generation(
             fdq.max_shop_churn,
         )
     except Exception as e:
+        logger.error(f"Data generation failed: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Data generation failed: {e}"
+            status_code=500, detail=f"Data generation failed: {str(e)}"
         )
 
+    logger.info(f"Fake data generation completed successfully for {fdq.start_date} to {fdq.end_date}")
+    
     return {
         "message": "Fake data generation completed",
         "start_date": fdq.start_date.isoformat(),
@@ -123,25 +201,16 @@ async def trigger_fake_data_generation(
         "summary": result_summary,
     }
 
-
-
-##TODO: Implement the user_snapshot endpoint
-## THIS IS BROKEN BECAUSE OF THE WAY create_partition_if_not_exists is implemented
-## create_partition_if_not_exists should be on each model in "generate_partition_key_if_not_exists"
-## and "Generate partition keysSSSS if not exists
-
-
 @router.post("/user_snapshot", response_model=UserSnapshotResponse)
 def user_snapshot(
     snapshot: UserSnapshot, db: Session = Depends(get_db)
 ):
+    logger.info("Starting user snapshot generation")
+
     try:
-        # Use the event_time from the schema, or default to current time
         event_time = snapshot.event_time or datetime.utcnow().replace(
             tzinfo=pytz.UTC
         )
-
-        # Partition key based on the event_time
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
@@ -209,7 +278,10 @@ def user_snapshot(
             FROM base2
         """
 
-        
+        res = db.execute(text(query))
+        rows = res.fetchall()
+        logger.info(f"Fetched {len(rows)} rows for user snapshot")
+
         update_query = text("""
             INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key, event_time)
             VALUES (:id, :email, :status, :created_time, :deactivated_time, :partition_key, :event_time)
@@ -223,14 +295,8 @@ def user_snapshot(
             RETURNING id
         """)
 
-
-        res = db.execute(text(query))
-
-        rows = res.fetchall()
-        print(f"Fetched {len(rows)} rows")
-
         for i, row in enumerate(rows):
-            # Check if the record already exists
+            logger.debug(f"Processing row {i+1}/{len(rows)}: {row}")
             existing_record = db.query(User).filter(User.id == row.id).first()
 
             new_record = User.validate_partition(
@@ -244,7 +310,7 @@ def user_snapshot(
             )
 
             if existing_record:
-                # Update existing record
+                logger.debug(f"Updating existing user record with ID: {row.id}")
                 res = db.execute(
                     update_query,
                     {
@@ -256,55 +322,51 @@ def user_snapshot(
                         "partition_key": new_record.partition_key,
                         "event_time": new_record.event_time, 
                     }
-                    
                 )
-
             else:
-                # Create new record
+                logger.debug(f"Creating new user record with ID: {row.id}")
                 db.add(new_record)
 
         db.commit()
 
-        # Return the response after processing
         users_processed = get_users_processed_count(db, partition_key)
-        
+        logger.info(f"User snapshot generation complete for partition_key {partition_key}. Users processed: {users_processed}")
+
         return UserSnapshotResponse(
             event_time=event_time,
             event_type="user_snapshot",
             event_metadata={"users_processed": users_processed},
         )
-        
-
 
     except Exception as e:
         db.rollback()
+        logger.error(f"User snapshot failed: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"User snapshot failed: {e}"
+            status_code=500, detail=f"User snapshot failed: {str(e)}"
         )
 
-
-
-
-
 def get_users_processed_count(db: Session, partition_key: date) -> int:
-    result = db.execute(
-        text(f"SELECT COUNT(*) FROM users WHERE partition_key::date = '{partition_key}'::date"),
-        {"partition_key": partition_key},
-    ).scalar()
-    return result
-
+    try:
+        result = db.execute(
+            text(f"SELECT COUNT(*) FROM users WHERE partition_key::date = '{partition_key}'::date"),
+            {"partition_key": partition_key},
+        ).scalar()
+        logger.debug(f"Users processed count for {partition_key}: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error counting processed users: {str(e)}")
+        raise
 
 @router.post("/shop_snapshot", response_model=ShopSnapshotResponse)
 def shop_snapshot(
     snapshot: ShopSnapshot, db: Session = Depends(get_db)
 ):
+    logger.info("Starting shop snapshot generation")
+
     try:
-        # Use the event_time from the schema, or default to current time
         event_time = snapshot.event_time or datetime.utcnow().replace(
             tzinfo=pytz.UTC
         )
-
-        # Partition key based on the event_time
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
@@ -378,6 +440,10 @@ def shop_snapshot(
         FROM base2
         """
 
+        res = db.execute(text(query))
+        rows = res.fetchall()
+        logger.info(f"Fetched {len(rows)} rows for shop snapshot")
+
         update_query = text("""
             INSERT INTO shops (id, shop_owner_id, shop_name, status, created_time, deactivated_time, partition_key, event_time)
             VALUES (:id, :shop_owner_id, :shop_name, :status, :created_time, :deactivated_time, :partition_key, :event_time)
@@ -391,14 +457,9 @@ def shop_snapshot(
                 event_time = EXCLUDED.event_time
             RETURNING id
         """)
-        
-        res = db.execute(text(query))
-
-        rows = res.fetchall()
-        print(f"Fetched {len(rows)} rows")
 
         for row in rows:
-            # Check if the record already exists
+            logger.debug(f"Processing shop record: {row}")
             existing_record = db.query(Shop).filter(Shop.id == row.id).first()
 
             new_record = Shop.validate_partition(
@@ -413,7 +474,7 @@ def shop_snapshot(
             )
 
             if existing_record:
-                # Update existing record
+                logger.debug(f"Updating existing shop record with ID: {row.id}")
                 db.execute(
                     update_query,
                     {
@@ -428,14 +489,14 @@ def shop_snapshot(
                     }
                 )
             else:
-                # Create new record
+                logger.debug(f"Creating new shop record with ID: {row.id}")
                 db.add(new_record)
 
         db.commit()
 
-        # Return the response after processing
         shops_processed = get_shops_processed_count(db, partition_key)
-        
+        logger.info(f"Shop snapshot generation complete for partition_key {partition_key}. Shops processed: {shops_processed}")
+
         return ShopSnapshotResponse(
             event_time=event_time,
             event_type="shop_snapshot",
@@ -444,13 +505,19 @@ def shop_snapshot(
 
     except Exception as e:
         db.rollback()
+        logger.error(f"Shop snapshot failed: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Shop snapshot failed: {e}"
+            status_code=500, detail=f"Shop snapshot failed: {str(e)}"
         )
 
 def get_shops_processed_count(db: Session, partition_key: date) -> int:
-    result = db.execute(
-        text(f"SELECT COUNT(*) FROM shops WHERE partition_key::date = '{partition_key}'::date"),
-        {"partition_key": partition_key},
-    ).scalar()
-    return result
+    try:
+        result = db.execute(
+            text(f"SELECT COUNT(*) FROM shops WHERE partition_key::date = '{partition_key}'::date"),
+            {"partition_key": partition_key},
+        ).scalar()
+        logger.debug(f"Shops processed count for {partition_key}: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error counting processed shops: {str(e)}")
+        raise

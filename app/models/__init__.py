@@ -48,3 +48,10 @@ class FakeHelper:
         self.shops = shops if shops is not None else []
 
         self.semaphore = asyncio.Semaphore(semaphore)
+
+    def reset_daily_counts(self):
+        """Resets the daily counts for users and shops."""
+        self.daily_users_created = 0
+        self.daily_users_deactivated = 0
+        self.daily_shops_created = 0
+        self.daily_shops_deleted = 0

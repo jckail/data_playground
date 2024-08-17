@@ -1,21 +1,87 @@
 <html>
     <head>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            .navbar {
+                overflow: hidden;
+                background-color: #333;
+                position: fixed;
+                top: 0;
+                width: 100%;
+                z-index: 1000;
+            }
+            .navbar a {
+                float: left;
+                display: block;
+                color: #f2f2f2;
+                text-align: center;
+                padding: 14px 16px;
+                text-decoration: none;
+            }
+            .navbar a:hover {
+                background-color: #ddd;
+                color: black;
+            }
+            .navbar button {
+                float: left;
+                padding: 14px 16px;
+                background-color: #333;
+                color: #f2f2f2;
+                border: none;
+                cursor: pointer;
+            }
+            .navbar button:hover {
+                background-color: #ddd;
+                color: black;
+            }
+            .content {
+                margin-top: 60px;
+                padding: 20px;
+            }
+            .plot-container {
+                width: 100%;
+                height: 500px;
+                margin-bottom: 20px;
+            }
+        </style>
     </head>
     <body>
-        <h1>Hello World</h1>
-        <form action="/trigger_fake_data" method="post">
-            <input type="submit" value="Generate Fake Data">
-        </form>
-        <br>
-        <a href="http://0.0.0.0:8000/docs" target="_blank">
-            <button>Go to Docs</button>
-        </a>
-        <a href="http://0.0.0.0:8501" target="_blank">
-            <button>Go to Streamlit Dashboard</button>
-        </a>
-        <div id="plot">
-            {% include "plot.html" %}
+        <div class="navbar">
+            <a href="http://0.0.0.0:8000/docs" target="_blank">Go to Docs</a>
+            <a href="http://0.0.0.0:8501" target="_blank">Go to Streamlit Dashboard</a>
+            <button onclick="triggerFakeData()">Generate Fake Data</button>
+            <button onclick="triggerFakeRollups()">Trigger Rollups</button>
         </div>
+        <div class="content">
+            <h2>Users and Shops Over Time</h2>
+            <div id="users_shops_plot" class="plot-container">
+                {% include "users_shops_plot.html" %}
+            </div>
+            <h2>Events Over Time</h2>
+            <div id="events_plot" class="plot-container">
+                {% include "events_plot.html" %}
+            </div>
+        </div>
+
+        <script>
+            function triggerFakeData() {
+                fetch('/trigger_fake_data', {
+                    method: 'POST'
+                }).then(response => response.json())
+                  .then(data => alert(data.message))
+                  .catch(error => console.error('Error:', error));
+            }
+
+            function triggerFakeRollups() {
+                fetch('/create_rollups', {
+                    method: 'POST'
+                }).then(response => response.json())
+                  .then(data => alert(data.message))
+                  .catch(error => console.error('Error:', error));
+            }
+        </script>
     </body>
 </html>

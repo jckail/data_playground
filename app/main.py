@@ -5,15 +5,13 @@ from fastapi.requests import Request
 from .routes import users, events, admin, shops, invoices, payments
 from .core.scheduler import start_scheduler, shutdown_scheduler
 from .tasks.fake_data_generator import run_async_generate_fake_data
+from .tasks.generate_plots import generate_plots
 import logging
 import sys
 import os
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from streamlit_app import create_plot
-import plotly.io as pio
 
 app = FastAPI()
 
@@ -41,16 +39,12 @@ async def shutdown_event():
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
+    # Regenerate the plots every time the index page is accessed
+    generate_plots()
+    
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/trigger_fake_data")
 async def trigger_fake_data(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_async_generate_fake_data)
-    
-    # Regenerate the plot
-    fig = create_plot()
-    plot_html = pio.to_html(fig, full_html=False)
-    with open('app/templates/plot.html', 'w') as f:
-        f.write(plot_html)
-    
     return {"message": "Fake data generation triggered"}
