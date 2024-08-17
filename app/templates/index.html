@@ -1,8 +1,21 @@
 <html>
+    <head>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    </head>
     <body>
         <h1>Hello World</h1>
         <form action="/trigger_fake_data" method="post">
             <input type="submit" value="Generate Fake Data">
         </form>
+        <br>
+        <a href="http://0.0.0.0:8000/docs" target="_blank">
+            <button>Go to Docs</button>
+        </a>
+        <a href="http://0.0.0.0:8501" target="_blank">
+            <button>Go to Streamlit Dashboard</button>
+        </a>
+        <div id="plot">
+            {% include "plot.html" %}
+        </div>
     </body>
 </html>

@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from app.database import execute_query
 import requests
+import plotly.io as pio
 
 # Queries
 users_query = "SELECT partition_key, count(*) a, count(distinct id) b FROM users group by partition_key order by 1;"
@@ -12,27 +13,40 @@ def generate_fake_data():
     response = requests.post("http://0.0.0.0:8000/trigger_fake_data")
     return response.json()["message"]
 
-# Execute queries
-users_data = execute_query(users_query)
-shops_data = execute_query(shops_query)
+def create_plot():
+    # Execute queries
+    users_data = execute_query(users_query)
+    shops_data = execute_query(shops_query)
 
-# Process data for plotting
-dates = [datetime.strptime(row['partition_key'], '%Y-%m-%d').date() for row in users_data]
-users_counts = [row['b'] for row in users_data]
-shops_counts = [row['b'] for row in shops_data]
+    # Process data for plotting
+    dates = [datetime.strptime(row['partition_key'], '%Y-%m-%d').date() for row in users_data]
+    users_counts = [row['b'] for row in users_data]
+    shops_counts = [row['b'] for row in shops_data]
+
+    # Create the plot
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=dates, y=users_counts, mode='lines', name='Users', line=dict(color='green')))
+    fig.add_trace(go.Scatter(x=dates, y=shops_counts, mode='lines', name='Shops', line=dict(color='blue')))
+
+    fig.update_layout(
+        title='Users and Shops Count Over Time',
+        xaxis_title='Date',
+        yaxis_title='Count',
+        legend_title='Entity Type',
+    )
+
+    return fig, users_data, shops_data
 
 # Create the plot
-fig = go.Figure()
+fig, users_data, shops_data = create_plot()
 
-fig.add_trace(go.Scatter(x=dates, y=users_counts, mode='lines', name='Users', line=dict(color='green')))
-fig.add_trace(go.Scatter(x=dates, y=shops_counts, mode='lines', name='Shops', line=dict(color='blue')))
+# Generate static HTML
+plot_html = pio.to_html(fig, full_html=False)
 
-fig.update_layout(
-    title='Users and Shops Count Over Time',
-    xaxis_title='Date',
-    yaxis_title='Count',
-    legend_title='Entity Type',
-)
+# Save the plot HTML to a file
+with open('app/templates/plot.html', 'w') as f:
+    f.write(plot_html)
 
 # Streamlit app
 st.title('Users and Shops Data Visualization')
