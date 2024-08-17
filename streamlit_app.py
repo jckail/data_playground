@@ -17,6 +17,20 @@ events_query = """
     GROUP BY event_date, hour, event_type
     ORDER BY hour;
 """
+request_response_logs_query = """
+    WITH recent_hour AS (
+        SELECT date_trunc('hour', MAX(event_time)) AS max_hour
+        FROM request_response_logs
+    )
+    SELECT date_trunc('minute', event_time) AS minute,
+           status_code,
+           count(*) as count
+    FROM request_response_logs, recent_hour
+    WHERE event_time >= recent_hour.max_hour
+      AND event_time < recent_hour.max_hour + INTERVAL '1 hour'
+    GROUP BY minute, status_code
+    ORDER BY minute;
+"""
 
 def generate_fake_data():
     response = requests.post("http://0.0.0.0:8000/trigger_fake_data")
@@ -91,22 +105,75 @@ def create_events_plot():
 
     return fig, events_data
 
+def create_status_code_plot():
+    # Execute the request_response_logs query
+    status_code_data = execute_query(request_response_logs_query)
+
+    # Process status code data for plotting
+    status_codes = {}
+    for row in status_code_data:
+        status_code = row['status_code']
+        minute = row['minute'].replace(second=0, microsecond=0)  # Ensure clean minute intervals
+        count = row['count']
+
+        if status_code not in status_codes:
+            status_codes[status_code] = {'minutes': [], 'counts': []}
+
+        status_codes[status_code]['minutes'].append(minute)
+        status_codes[status_code]['counts'].append(count)
+
+    # Check if the data was grouped correctly
+    st.write('Processed Status Code Data:', status_codes)  # Debugging line to inspect processed data
+
+    # Create the plot for status code data
+    fig = go.Figure()
+
+    # Add traces for each status code
+    for status_code, data in status_codes.items():
+        fig.add_trace(go.Scatter(
+            x=data['minutes'],
+            y=data['counts'],
+            mode='lines',
+            name=f"Status {status_code}",
+            line=dict(shape='linear')
+        ))
+
+    fig.update_layout(
+        title='Status Code Counts Per Minute for the Most Recent Hour',
+        xaxis_title='Time (Minute Intervals)',
+        yaxis_title='Count',
+        legend_title='Status Code',
+        xaxis=dict(
+            tickformat="%H:%M",
+            tickmode="linear",
+            nticks=15,  # 60 minutes in the hour
+        )
+    )
+
+    return fig, status_code_data
+
+
+
 # Create the plots
 users_shops_fig, users_data, shops_data = create_users_shops_plot()
 events_fig, events_data = create_events_plot()
+status_code_fig, status_code_data = create_status_code_plot()
 
 # Generate static HTML for each plot
 users_shops_html = pio.to_html(users_shops_fig, full_html=False)
 events_html = pio.to_html(events_fig, full_html=False)
+status_code_html = pio.to_html(status_code_fig, full_html=False)
 
 # Save the plot HTML to files
 with open('app/templates/users_shops_plot.html', 'w') as f:
     f.write(users_shops_html)
 with open('app/templates/events_plot.html', 'w') as f:
     f.write(events_html)
+with open('app/templates/status_code_plot.html', 'w') as f:
+    f.write(status_code_html)
 
 # Streamlit app
-st.title('Users, Shops, and Event Data Visualization')
+st.title('Users, Shops, Event, and Status Code Data Visualization')
 
 # Display the users and shops plot
 st.subheader('Users and Shops Count Over Time')
@@ -115,6 +182,10 @@ st.plotly_chart(users_shops_fig)
 # Display the events plot
 st.subheader('Event Counts Over Time')
 st.plotly_chart(events_fig)
+
+# Display the status code plot
+st.subheader('Status Code Counts Over Time')
+st.plotly_chart(status_code_fig)
 
 # Create two columns for buttons
 col1, col2 = st.columns(2)
@@ -144,3 +215,5 @@ st.write('Shops Data:')
 st.write(shops_data)
 st.write('Events Data:')
 st.write(events_data)
+st.write('Status Code Data:')
+st.write(status_code_data)

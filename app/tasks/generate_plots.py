@@ -1,5 +1,5 @@
 import plotly.io as pio
-from streamlit_app import create_users_shops_plot, create_events_plot
+from streamlit_app import create_users_shops_plot, create_events_plot, create_status_code_plot
 
 def generate_plots():
     # Generate the users/shops plot
@@ -13,3 +13,9 @@ def generate_plots():
     events_plot_html = pio.to_html(events_fig, full_html=False)
     with open('app/templates/events_plot.html', 'w') as f:
         f.write(events_plot_html)
+
+    # Generate the status code plot for the most recent hour
+    status_code_fig, status_code_data = create_status_code_plot()
+    status_code_plot_html = pio.to_html(status_code_fig, full_html=False)
+    with open('app/templates/status_code_plot.html', 'w') as f:
+        f.write(status_code_plot_html)
