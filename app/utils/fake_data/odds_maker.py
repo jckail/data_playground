@@ -5,7 +5,7 @@ import random
 
 
 class OddsMaker(BaseModel):
-    max_fake_users_per_day: int = Field(default=2000)
+    max_fake_users_per_day: int = Field(default=1200)
     max_fake_shops_per_day: int = Field(default=2000)
     max_user_growth_rate: float = Field(default=0.2)
     max_shop_growth_rate: float = Field(default=0.2)

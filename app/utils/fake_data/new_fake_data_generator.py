@@ -1,26 +1,36 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from typing import List, Dict
 import httpx
 
+from app.utils.fake_data.new_fake_data_generator_models import BaseDataStore
+from app.utils.fake_data.new_fake_data_generator_helpers import get_time
 
-from app.utils.fake_data.new_fake_data_generator_models import  BaseDataStore
-from app.utils.fake_data.new_fake_data_generator_helpers import  get_time
+async def process_date_range(base: BaseDataStore, start_date: datetime, end_date: datetime):
+    current_date = start_date
+    while current_date <= end_date:
+        print(f"Processing date: {current_date.date()}")
+        await base.process_day(current_date)
+        current_date += timedelta(days=1)
 
-
-async def main(base, current_date):  #TODO replace main with a daily that takes in a datastore and a date
-
+async def main():
+    base = BaseDataStore()
+    end_date = get_time()
+    start_date = end_date - timedelta(days=7)  # 365*2 Two years ago
     
+    await process_date_range(base, start_date, end_date)
+
+async def old_main():  #TODO replace main with a daily that takes in a datastore and a date
+    base = BaseDataStore()
+    current_date = get_time()
     await base.process_day(current_date)
 
-    
-
 if __name__ == "__main__":
-    base = BaseDataStore()
-    current_date = get_time() #TODO replace main with a daily that takes in a datastore and a date
-    asyncio.run(main(base, current_date))
-
+    # base = BaseDataStore()
+    # current_date = get_time() #TODO replace main with a daily that takes in a datastore and a date
+    # asyncio.run(main(base, current_date))
+    asyncio.run(main())
 
     """
 

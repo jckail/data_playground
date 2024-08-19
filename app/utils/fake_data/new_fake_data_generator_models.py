@@ -43,6 +43,8 @@ class BaseDataStore(BaseModel):
         self.action_counter.shops_created += len(self.batch.new_shops)
         self.action_counter.shops_deleted += len(self.batch.del_shops)
 
+
+
         for user in self.batch.active_users:
             self.users[user.id] = user
 
@@ -64,24 +66,39 @@ class BaseDataStore(BaseModel):
         #data_store = BaseDataStore() # this will be used accross days
 
         self.create_batch()
-        self.batch.new_users = await generate_users( 1000, current_date)
+        user_count = await self.batch.om.generate_fake_user_growth_amount(self.active_users)
 
+        self.batch.new_users = await generate_users( user_count, current_date)
+        self.batch.active_users += self.batch.new_users
         #TODO:  add in user shuffle logic here for which users generate shops
         new_shop_users = self.batch.new_users ##TODO: We will add in previously created users too! This will be a funciton on the base data store
 
         #todo this will run twice once for same day users
         # once for previous day users
-        self.batch.new_shops = await generate_shops(new_shop_users, 1000, current_date)
+
+        
+        self.batch.new_shops = await generate_shops(new_shop_users, user_count, current_date)
         # TODO since some event creation times are before the user creation time we need to reshuffle users and try to run generate shops again
         
+        self.batch.new_shops += await generate_shops(self.batch.active_users, user_count, current_date)
         
-        within_deactivated_shops = await deactivate_shops(self.batch.new_shops, 1000, current_date)
+        self.batch.active_shops += self.batch.new_shops
 
-        users_to_deactivate = self.batch.new_users
-        deactivated_users, deactivated_shops = await deactivate_users(users_to_deactivate, 1000, current_date)
 
+        
+
+
+        within_deactivated_shops = await deactivate_shops(self.batch.active_shops, user_count, current_date)
+
+        users_to_deactivate = self.batch.active_users
+        deactivated_users, deactivated_shops = await deactivate_users(users_to_deactivate, user_count, current_date)  
+        self.batch.active_users = [user for user in self.batch.active_users if user.id not in [deleted_user.id for deleted_user in deactivated_users]]
 
         daily_deactivated_shops =  within_deactivated_shops+ deactivated_shops
+        self.batch.active_shops = [shop for shop in self.batch.active_shops if shop.id not in [deleted_shop.id for deleted_shop in daily_deactivated_shops]]
+
+        
+
 
         self.batch.del_users = deactivated_users
         self.batch.del_shops = daily_deactivated_shops

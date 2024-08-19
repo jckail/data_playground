@@ -26,16 +26,17 @@ class Shop(BaseModel):
         if not event_time:
             event_time = generate_event_time(current_date)
         if event_time > self.created_time and not self.deactivated_time:
-            self.deactivated_time = event_time
-            payload = {"shop_id": self.id, "event_time": self.deactivated_time}
+            
+            payload = {"shop_id": str(self.id), "event_time":event_time.isoformat()}
             response = await api_request(
                 client, "POST", f"{BASE_URL}/delete_shop/", payload
             )
             if response:
+                self.deactivated_time = event_time
                 return self
             else:
                 logger.error(
-                    f"Shop deletion failed for email: {self.shop_name}"
+                    f"Shop deletion failed for shop: {self.shop_name}"
                 )
 
                 

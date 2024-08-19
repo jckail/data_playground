@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 import uuid
 from typing import List,  Optional
@@ -6,6 +7,7 @@ import httpx
 
 from .new_fake_data_generator_helpers import (
     api_request,
+    check_api_connection,
     generate_event_time,
     BASE_URL,
     logger,
@@ -74,9 +76,24 @@ class User(BaseModel):
             shops = []
             for shop in self.shops:
                 shops.append(await shop.deactivate(current_date, event_time, client))
-            self.deactivated_time = event_time
-            return self,shops
+            payload = {"identifier": str(self.id), "event_time": event_time.isoformat()}
+            response = await api_request(
+                client, "POST", f"{BASE_URL}/deactivate_user/", payload
+            )
+            if response:
+                self.deactivated_time = event_time
+                return self,shops
+            else:
+                logger.error(f"User Deletion failed for email: {self.email}")
         return None, None
+            
+            
+            
+            
+            
+
+            
+        
     
 
 
