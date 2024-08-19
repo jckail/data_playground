@@ -23,7 +23,7 @@ services:
 
   db:
     image: postgres:13
-    command: -c 'max_connections=500'
+    command: -c 'max_connections=500' -c 'max_locks_per_transaction=128'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:

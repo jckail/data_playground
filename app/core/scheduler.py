@@ -6,14 +6,14 @@ from app.tasks.rollup_task import run_rollups_task  # Import the new task functi
 
 scheduler = BackgroundScheduler()
 
-# Schedule fake data generation every 5 minutes
-scheduler.add_job(run_async_generate_fake_data, CronTrigger(minute='*/5'))
+# #Schedule fake data generation every 5 minutes
+#scheduler.add_job(run_async_generate_fake_data, CronTrigger(minute='*/5'))
 
 # Schedule plot generation every 5 minutes
-scheduler.add_job(generate_plots, CronTrigger(minute='*/5'))
+#scheduler.add_job(generate_plots, CronTrigger(minute='*/5'))
 
-# Schedule rollups task every 15 minutes
-scheduler.add_job(run_rollups_task, CronTrigger(minute='*/15'))
+# # Schedule rollups task every 15 minutes
+#scheduler.add_job(run_rollups_task, CronTrigger(minute='*/15'))
 
 def start_scheduler():
     scheduler.start()

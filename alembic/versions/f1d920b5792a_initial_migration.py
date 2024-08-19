@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: 9f9eed7f86e8
+Revision ID: f1d920b5792a
 Revises: 
-Create Date: 2024-08-16 23:19:58.771097
+Create Date: 2024-08-19 07:44:55.045278
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9f9eed7f86e8'
+revision: str = 'f1d920b5792a'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -38,6 +38,20 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('payment_id', 'partition_key'),
     postgresql_partition_by='RANGE (partition_key)'
     )
+    op.create_table('request_response_logs',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('method', sa.String(), nullable=True),
+    sa.Column('url', sa.String(), nullable=True),
+    sa.Column('request_body', sa.Text(), nullable=True),
+    sa.Column('response_body', sa.Text(), nullable=True),
+    sa.Column('status_code', sa.Integer(), nullable=True),
+    sa.Column('event_time', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('partition_key', sa.String(), nullable=False),
+    sa.PrimaryKeyConstraint('id', 'partition_key'),
+    postgresql_partition_by='LIST (partition_key)'
+    )
+    op.create_index(op.f('ix_request_response_logs_method'), 'request_response_logs', ['method'], unique=False)
+    op.create_index(op.f('ix_request_response_logs_url'), 'request_response_logs', ['url'], unique=False)
     op.create_table('shops',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('shop_owner_id', sa.UUID(), nullable=False),
@@ -79,6 +93,9 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('user_invoices')
     op.drop_table('shops')
+    op.drop_index(op.f('ix_request_response_logs_url'), table_name='request_response_logs')
+    op.drop_index(op.f('ix_request_response_logs_method'), table_name='request_response_logs')
+    op.drop_table('request_response_logs')
     op.drop_table('payments')
     op.drop_table('global_events')
     # ### end Alembic commands ###

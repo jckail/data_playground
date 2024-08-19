@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg://user:password@localhost/dbname"
+    "postgresql+psycopg://user:password@db/dbname"
 )
 
 engine = create_engine(
