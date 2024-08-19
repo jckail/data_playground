@@ -13,6 +13,7 @@ async def process_date_range(base: BaseDataStore, start_date: datetime, end_date
         print(f"Processing date: {current_date.date()}")
         await base.process_day(current_date)
         current_date += timedelta(days=1)
+    base.analyze_trends()
 
 async def main():
     base = BaseDataStore()

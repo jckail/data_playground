@@ -87,7 +87,13 @@ class User(BaseModel):
                 logger.error(f"User Deletion failed for email: {self.email}")
         return None, None
             
-            
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if isinstance(other, User):
+            return self.id == other.id
+        return False
             
             
             

@@ -43,3 +43,11 @@ class Shop(BaseModel):
             self.deactivated_time = event_time
             return self
         return None
+    
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if isinstance(other, Shop):
+            return self.id == other.id
+        return False
