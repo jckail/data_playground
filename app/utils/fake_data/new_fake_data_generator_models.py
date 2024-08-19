@@ -175,8 +175,8 @@ class BaseDataStore(BaseModel):
         shops_per_user = [len(user.shops) for user in active_user_list]
         avg_shops_per_user = sum(shops_per_user) / len(active_user_list) if active_user_list else 0
 
-        logger.info(f"Average shops per active user: {avg_shops_per_user:.2f}")
-        logger.info(f"Shop distribution:")
+        logger.info(f" Average shops per active user: {avg_shops_per_user:.2f}")
+        logger.info(f" Shop distribution:")
         for i in range(max(shops_per_user) + 1):
             count = shops_per_user.count(i)
             percentage = (count / len(active_user_list)) * 100 if active_user_list else 0

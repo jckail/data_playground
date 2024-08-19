@@ -1,0 +1,25 @@
+# Dockerfile.streamlit
+
+FROM python:3.12
+
+WORKDIR /code
+
+# Copy the requirements file and install dependencies
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+
+# Copy the entire Streamlit app directory
+COPY ./streamlit_app /code/streamlit_app
+
+# Set the PYTHONPATH
+ENV PYTHONPATH=/code:/code/streamlit_app
+
+# Expose the port for Streamlit
+EXPOSE 8501
+
+# Create a script to run Streamlit
+RUN echo '#!/bin/sh\n\
+streamlit run /code/streamlit_app/main.py --server.port 8501 --server.address 0.0.0.0' > /code/start_streamlit.sh && chmod +x /code/start_streamlit.sh
+
+# Run the Streamlit start script
+CMD ["/code/start_streamlit.sh"]

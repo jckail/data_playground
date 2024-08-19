@@ -1,9 +1,11 @@
+import asyncio
 import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
@@ -49,7 +51,7 @@ class PartitionedTableComparator:
 
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == "table":
-        return not (name.startswith("global_events_p_") or name.startswith("shops_p_")or name.startswith("users_p_")or "_p_" in name)
+        return not (name.startswith("global_events_p_") or name.startswith("shops_p_") or name.startswith("users_p_") or "_p_" in name)
     return True
 
 def run_migrations_offline() -> None:
@@ -66,29 +68,38 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+        compare_type=True,
+        compare_server_default=True,
+        include_schemas=True,
+        render_item=PartitionedTableComparator(context, ["global_events", "shops"]).render_item,
     )
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata,
-            include_object=include_object,
-            compare_type=True,
-            compare_server_default=True,
-            include_schemas=True,
-            render_item=PartitionedTableComparator(context, ["global_events", "shops"]).render_item,
+    with context.begin_transaction():
+        context.run_migrations()
+
+async def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    try:
+        connectable = async_engine_from_config(
+            config.get_section(config.config_ini_section),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
         )
 
-        with context.begin_transaction():
-            context.run_migrations()
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+
+        await connectable.dispose()
+    except Exception as e:
+        print(f"Error during migration: {e}")
+        raise
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online()
+    asyncio.run(run_migrations_online())

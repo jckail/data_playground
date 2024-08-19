@@ -52,7 +52,7 @@ class User(BaseModel):
                 return shop
             else:
                 logger.error(
-                    f"Shop creation failed for email: {shop.shop_name}"
+                    f" Shop creation failed for Shop Name: {shop.shop_name}"
                 )
         return None
     

@@ -13,7 +13,7 @@ from .new_fake_data_generator_helpers import (
 from .odds_maker import OddsMaker
 from .user import User, Shop, generate_fake_user
 
-async def process_in_chunks(tasks, chunk_size=50):
+async def process_in_chunks(tasks, chunk_size=200):
     results = []
     total_tasks = len(tasks)
     logger.info(f"Processing {total_tasks} tasks in chunks of {chunk_size}")

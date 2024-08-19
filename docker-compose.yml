@@ -1,15 +1,16 @@
 version: "3.8"
 services:
-  web:
-    build: .
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
     ports:
       - "8000:8000"
-      - "8501:8501"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://user:password@db/dbname
+      - DATABASE_URL=postgresql+asyncpg://user:password@db/dbname
       - PYTHONPATH=/code
       - POOL_SIZE=250
       - MAX_OVERFLOW=50
@@ -19,7 +20,17 @@ services:
       - ./app:/code/app
       - ./alembic:/code/alembic
       - ./alembic.ini:/code/alembic.ini
-      - ./streamlit_app.py:/code/streamlit_app.py
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONPATH=/code
+    volumes:
+      - ./streamlit_app:/code/streamlit_app
 
   db:
     image: postgres:13
