@@ -18,11 +18,11 @@ __all__ = [
 class EventPropensity:
     def __init__(
         self,
-        max_fake_users_per_day=100,
-        max_user_churn=0.1,
-        max_first_shop_creation_percentage=0.8,
+        max_fake_users_per_day=2000,
+        max_user_churn=0.2,
+        max_first_shop_creation_percentage=0.6,
         max_multiple_shop_creation_percentage=0.1,
-        max_shop_churn=0.2,
+        max_shop_churn=0.3,
     ):
         self.max_fake_users_per_day = max_fake_users_per_day
         self.max_user_churn = max_user_churn

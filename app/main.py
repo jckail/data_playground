@@ -36,6 +36,10 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 async def startup_event():
     start_scheduler()
 
+@app.get("/health/")
+async def health_check():
+    return {"status": "ok"}
+
 @app.on_event("shutdown")
 async def shutdown_event():
     shutdown_scheduler()
