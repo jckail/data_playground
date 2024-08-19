@@ -1,10 +1,10 @@
 import asyncio
 from datetime import datetime
+from typing import List, Dict
+import httpx
 import pytz
-from typing import Dict
 from faker import Faker
 import logging
-import httpx
 import os
 import random
 
@@ -52,65 +52,68 @@ async def check_api_connection(url: str) -> bool:
             return False
         
 
-class odds_maker:
-    def __init__(self, 
-        max_fake_users_per_day=2000,
-        max_fake_shops_per_day=2000,
+# class odds_maker:
+#     def __init__(self, 
+#         max_fake_users_per_day=2000,
+#         max_fake_shops_per_day=2000,
 
-        max_user_growth_rate=0.2,
-        max_shop_growth_rate=0.2,
-        user_shop_population=0.5,
-        shop_creation_chance=0.8,
+#         max_user_growth_rate=0.2,
+#         max_shop_growth_rate=0.2,
+#         user_shop_population=0.5,
+#         shop_creation_chance=0.8,
         
-        user_churn_chance=0.2,
-        shop_churn_chance=0.3
+#         user_churn_chance=0.2,
+#         shop_churn_chance=0.3
         
         
-        ):
+#         ):
 
-        self.max_fake_users_per_day = max_fake_users_per_day
-        self.max_fake_shops_per_day = max_fake_shops_per_day
-        self.max_user_growth_rate = max_user_growth_rate
-        self.max_shop_growth_rate = max_shop_growth_rate
-        self.user_shop_population = user_shop_population
-        self.shop_creation_chance = shop_creation_chance
-        self.user_churn_chance = user_churn_chance
-        self.shop_churn_chance = shop_churn_chance
-        self.shops_to_generate = int(random.uniform(0, max_fake_shops_per_day)
-        )   
+#         self.max_fake_users_per_day = max_fake_users_per_day
+#         self.max_fake_shops_per_day = max_fake_shops_per_day
+#         self.max_user_growth_rate = max_user_growth_rate
+#         self.max_shop_growth_rate = max_shop_growth_rate
+#         self.user_shop_population = user_shop_population
+#         self.shop_creation_chance = shop_creation_chance
+#         self.user_churn_chance = user_churn_chance
+#         self.shop_churn_chance = shop_churn_chance
+#         self.shops_to_generate = int(random.uniform(0, max_fake_shops_per_day)
+#         )   
 
-    async def gen_prop(self, p_list, propensity, max_value=None, r=False):
-        population = len(p_list)
-        if population == 0:
-            return max_value
+#     async def gen_prop(self, p_list, propensity, max_value=None, r=False):
+#         population = len(p_list)
+#         if population == 0:
+#             return max_value
 
-        if not max_value:
-            max_value = population
+#         if not max_value:
+#             max_value = population
 
-        if r:
-            propensity = random.uniform(0, propensity)
+#         if r:
+#             propensity = random.uniform(0, propensity)
 
-        return min(int(len(population) * propensity), max_value)
+#         return min(int(len(population) * propensity), max_value)
     
-    async def list_randomizer(self, input_list):
-        for _ in range(int(random.uniform(1, 3))):
-            input_list = random.shuffle(input_list)
-        return input_list
+#     async def list_randomizer(self, input_list):
+#         for _ in range(int(random.uniform(1, 3))):
+#             input_list = random.shuffle(input_list)
+#         return input_list
 
-    async def generate_fake_user_growth_amount(self, user_list):
-        return await self.gen_prop(user_list, self.max_user_growth_rate, self.max_fake_users_per_day)
+#     async def generate_fake_user_growth_amount(self, user_list):
+#         return await self.gen_prop(user_list, self.max_user_growth_rate, self.max_fake_users_per_day)
     
-    async def generate_fake_shop_growth(self, user_list, shop_list):
-        num_shops_to_create = await self.gen_prop(shop_list, self.max_shop_growth_rate, self.max_fake_shops_per_day)
-        user_list = self.list_randomizer(self, user_list)
-        return user_list[:num_shops_to_create]
+#     async def generate_fake_shop_growth(self, user_list, shop_list):
+#         num_shops_to_create = await self.gen_prop(shop_list, self.max_shop_growth_rate, self.max_fake_shops_per_day)
+#         user_list = self.list_randomizer(self, user_list)
+#         return user_list[:num_shops_to_create]
     
-    async def generate_fake_shop_churn(self, shop_list):
-        num_shops_to_del = await self.gen_prop(shop_list, self.shop_churn_chance, self.max_fake_shops_per_day)
-        shop_list = self.list_randomizer(self, shop_list)
-        return shop_list[:num_shops_to_del]
+#     async def generate_fake_shop_churn(self, shop_list):
+#         num_shops_to_del = await self.gen_prop(shop_list, self.shop_churn_chance, self.max_fake_shops_per_day)
+#         shop_list = self.list_randomizer(self, shop_list)
+#         return shop_list[:num_shops_to_del]
     
     # async def generate_fake_shop_churn(self, shop_list):
     #     num_shops_to_del = await self.gen_prop(shop_list, self.shop_churn_chance, self.max_fake_shops_per_day)
     #     shop_list = self.list_randomizer(self, shop_list)
     #     return shop_list[:num_shops_to_del]
+
+
+

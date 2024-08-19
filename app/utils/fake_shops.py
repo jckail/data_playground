@@ -181,3 +181,7 @@ if __name__ == "__main__":
             return {}
 
     asyncio.run(generate_fake_shop_data(start_date, end_date))
+
+
+
+
