@@ -1,0 +1,28 @@
+Trend analysis from 2024-08-12 06:51:32.013722+00:00 to 2024-08-19 06:51:32.013722+00:00:
+  users_created:
+    Total change: 140
+    Average daily change: 20.00
+  users_deactivated:
+    Total change: 140
+    Average daily change: 20.00
+  shops_created:
+    Total change: 2
+    Average daily change: 0.29
+  shops_deleted:
+    Total change: 1
+    Average daily change: 0.14
+  active_users:
+    Total change: 0
+    Average daily change: 0.00
+  active_shops:
+    Total change: 1
+    Average daily change: 0.14
+  processing_time:
+    Total change: -0.46 seconds
+    Average daily change: -0.07 seconds
+    Fastest day: 0.39 seconds
+    Slowest day: 1.04 seconds
+Processing time statistics:
+  Average: 0.56 seconds
+  Minimum: 0.39 seconds
+  Maximum: 1.04 seconds

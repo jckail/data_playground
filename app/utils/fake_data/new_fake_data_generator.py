@@ -18,7 +18,7 @@ async def process_date_range(base: BaseDataStore, start_date: datetime, end_date
 async def main():
     base = BaseDataStore()
     end_date = get_time()
-    start_date = end_date - timedelta(days=7)  # 365*2 Two years ago
+    start_date = end_date - timedelta(days=365*2)  # 365*2 Two years ago
     
     await process_date_range(base, start_date, end_date)
 

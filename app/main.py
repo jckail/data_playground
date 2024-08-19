@@ -32,17 +32,17 @@ app.include_router(shops.router)
 app.include_router(events.router)
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
-@app.on_event("startup")
-async def startup_event():
-    start_scheduler()
+# @app.on_event("startup")
+# async def startup_event():
+#     start_scheduler()
 
 @app.get("/health/")
 async def health_check():
     return {"status": "ok"}
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    shutdown_scheduler()
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     shutdown_scheduler()
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):

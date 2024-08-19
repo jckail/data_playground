@@ -1,0 +1,39 @@
+{
+  "trend_analysis": {
+    "users_created": {
+      "total_change": 6999,
+      "avg_daily_change": 999.8571428571429
+    },
+    "users_deactivated": {
+      "total_change": 7000,
+      "avg_daily_change": 1000.0
+    },
+    "shops_created": {
+      "total_change": 2676,
+      "avg_daily_change": 382.2857142857143
+    },
+    "shops_deleted": {
+      "total_change": 4001,
+      "avg_daily_change": 571.5714285714286
+    },
+    "active_users": {
+      "total_change": -1,
+      "avg_daily_change": -0.14285714285714285
+    },
+    "active_shops": {
+      "total_change": -1325,
+      "avg_daily_change": -189.28571428571428
+    },
+    "processing_time": {
+      "total_change": -15.833179999999999,
+      "avg_daily_change": -2.261882857142857,
+      "fastest_day": 12.895667,
+      "slowest_day": 32.622806
+    }
+  },
+  "processing_time_statistics": {
+    "average": 18.886005,
+    "minimum": 12.895667,
+    "maximum": 32.622806
+  }
+}

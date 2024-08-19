@@ -9,8 +9,8 @@ class OddsMaker(BaseModel):
     """
     A class to generate odds and randomize data for user and shop simulations.
     """
-    max_fake_users_per_day: int = Field(default=5000, description="Maximum number of fake users that can be created per day")
-    max_fake_shops_per_day: int = Field(default=4000, description="Maximum number of fake shops that can be created per day")
+    max_fake_users_per_day: int = Field(default=100, description="Maximum number of fake users that can be created per day")
+    max_fake_shops_per_day: int = Field(default=1, description="Maximum number of fake shops that can be created per day")
     max_user_growth_rate: float = Field(default=0.2, description="Maximum growth rate for users")
     max_shop_growth_rate: float = Field(default=0.2, description="Maximum growth rate for shops")
     user_shop_population: float = Field(default=0.5, description="Proportion of users who own shops")
