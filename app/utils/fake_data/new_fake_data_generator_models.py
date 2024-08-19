@@ -4,180 +4,20 @@ import uuid
 from typing import List, Dict, Optional
 import httpx
 from pydantic import BaseModel, Field
-import random
+
 
 from .new_fake_data_generator_helpers import (
-    api_request,
-    generate_event_time,
     BASE_URL,
     logger,
-    fake,
     check_api_connection
 
 )
 
+from .odds_maker import OddsMaker
 
 
+from .user import User, Shop, generate_fake_user
 
-class OddsMaker(BaseModel):
-    max_fake_users_per_day: int = Field(default=2000)
-    max_fake_shops_per_day: int = Field(default=2000)
-    max_user_growth_rate: float = Field(default=0.2)
-    max_shop_growth_rate: float = Field(default=0.2)
-    user_shop_population: float = Field(default=0.5)
-    shop_creation_chance: float = Field(default=0.8)
-    user_churn_chance: float = Field(default=0.2)
-    shop_churn_chance: float = Field(default=0.3)
-    shops_to_generate: int = Field(default_factory=lambda: int(random.uniform(0, 2000)))
-
-    async def gen_prop(self, p_list: List, propensity: float, max_value: int = None, r: bool = False) -> int:
-        population = len(p_list)
-        if population == 0:
-            return max_value or 0
-
-        if not max_value:
-            max_value = population
-
-        if r:
-            propensity = random.uniform(0, propensity)
-
-        return min(int(population * propensity), max_value)
-    
-    async def list_randomizer(self, input_list: List) -> List:
-        for _ in range(int(random.uniform(1, 3))):
-            random.shuffle(input_list)
-        return input_list
-
-    async def generate_fake_user_growth_amount(self, user_list: List) -> int:
-        return await self.gen_prop(user_list, self.max_user_growth_rate, self.max_fake_users_per_day)
-    
-    async def generate_fake_shop_growth(self, user_list: List, shop_list: List) -> List:
-        num_shops_to_create = await self.gen_prop(shop_list, self.max_shop_growth_rate, self.max_fake_shops_per_day)
-        user_list = await self.list_randomizer(user_list)
-        return user_list[:num_shops_to_create]
-    
-    async def generate_fake_shop_churn(self, shop_list: List) -> List:
-        num_shops_to_del = await self.gen_prop(shop_list, self.shop_churn_chance, self.max_fake_shops_per_day)
-        shop_list = await self.list_randomizer(shop_list)
-        return shop_list[:num_shops_to_del]
-
-
-
-
-class Shop(BaseModel):
-    id: uuid.UUID
-    shop_owner_id: uuid.UUID
-    shop_name: str
-    created_time: datetime
-    deactivated_time: Optional[datetime] = None
-
-
-
-    async def deactivate(self,current_date, event_time= None,   client=None):
-        if not event_time:
-            event_time = generate_event_time(current_date)
-        if event_time > self.created_time and not self.deactivated_time:
-            self.deactivated_time = event_time
-            payload = {"shop_id": self.id, "event_time": self.deactivated_time}
-            response = await api_request(
-                client, "POST", f"{BASE_URL}/delete_shop/", payload
-            )
-            if response:
-                return self
-            else:
-                logger.error(
-                    f"Shop deletion failed for email: {self.shop_name}"
-                )
-
-                
-            self.deactivated_time = event_time
-            return self
-        return None
-
-
-
-class User(BaseModel):
-    id: uuid.UUID
-    email: str
-    created_time: datetime
-    deactivated_time: Optional[datetime] = None
-    shops: List[uuid.UUID] = Field(default_factory=list)
-
-
-
-    async def create_shop(self, current_date, client=None) -> Shop:
-
-        shop = Shop(
-                id=uuid.uuid4(),
-                shop_owner_id=self.id,
-                shop_name=fake.company(),
-                created_time=generate_event_time(current_date),
-            )
-
-        if shop.created_time > self.created_time and not self.deactivated_time:
-            payload = {
-                "shop_owner_id": str(shop.shop_owner_id),
-                "shop_name": shop.shop_name,
-                "event_time": shop.created_time.isoformat(),
-            }
-            response = await api_request(
-                client, "POST", f"{BASE_URL}/create_shop/", payload
-            )
-            if response:
-                shop.id = uuid.UUID(response["event_metadata"]["shop_id"])
-                self.shops.append(shop)
-                return shop
-            else:
-                logger.error(
-                    f"Shop creation failed for email: {shop.shop_name}"
-                )
-        return None
-
-    #This should be a method considering create_shop is a method however the is simpler for now
-    # def deactivate_shop(
-    #     self, shop: Shop, current_date, client=None
-    # ) -> Optional[Shop]:
-    #     event_time = generate_event_time(current_date)
-    #     if event_time > self.created_time and not self.deactivated_time:
-    #         for s in self.shops:
-    #             if s.id == shop.id:
-    #                 s.deactivate(event_time,client)
-    #                 return s
-    #     return None
-
-    async def deactivate(self,current_date, event_time= None,   client=None):
-        if not event_time:
-            event_time = generate_event_time(current_date)
-        
-        if event_time > self.created_time:
-            shops = []
-            for shop in self.shops:
-                shops.append(await shop.deactivate(current_date, event_time, client))
-            self.deactivated_time = event_time
-            return self,shops
-        return None, None
-
-async def generate_fake_user(current_date: datetime, client: httpx.AsyncClient):
-
-    user = User(
-            id=uuid.uuid4(),
-            email=fake.email(),
-            created_time=generate_event_time(current_date),
-        )
-
-    payload = {
-        "email": user.email,
-        "event_time": user.created_time.isoformat(),
-    }
-    response = await api_request(
-        client, "POST", f"{BASE_URL}/create_user/", payload
-    )
-    if response:
-        user.id = uuid.UUID(response["event_metadata"]["user_id"])
-        return user
-    else:
-        logger.error(f"User creation failed for email: {user.email}")
-        return None
 
 
 async def generate_users( n: int, current_date: datetime) -> List[User]:

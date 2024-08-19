@@ -5,8 +5,8 @@ from typing import List, Dict
 import httpx
 
 
-from app.utils.new_fake_data_generator_models import User, generate_fake_user,  Shop, ActionCounter, BaseDataStore, BatchDataStore, OddsMaker
-from app.utils.new_fake_data_generator_helpers import api_request, get_time, generate_event_time, check_api_connection, BASE_URL, logger
+from app.utils.fake_data.new_fake_data_generator_models import User, generate_fake_user,  Shop, ActionCounter, BaseDataStore, BatchDataStore, OddsMaker
+from app.utils.fake_data.new_fake_data_generator_helpers import api_request, get_time, generate_event_time, check_api_connection, BASE_URL, logger
 
     
 
