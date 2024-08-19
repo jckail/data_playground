@@ -1,5 +1,7 @@
+.env
 .venv/*
 *tempCodeRunnerFile.py
 *.pyc
 templates/*
 !templates/index.html
+offlinenotes.txt
