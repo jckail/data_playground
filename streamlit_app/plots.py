@@ -30,20 +30,20 @@ async def create_events_plot():
     events_by_type = {}
     for row in events_data:
         event_type = row['event_type']
-        hour = row['hour']
+        event_date = row['event_date']
         count = row['count']
 
         if event_type not in events_by_type:
-            events_by_type[event_type] = {'hours': [], 'counts': []}
+            events_by_type[event_type] = {'dates': [], 'counts': []}
 
-        events_by_type[event_type]['hours'].append(hour)
+        events_by_type[event_type]['dates'].append(event_date)
         events_by_type[event_type]['counts'].append(count)
 
     fig = go.Figure()
 
     for event_type, data in events_by_type.items():
         fig.add_trace(go.Scatter(
-            x=data['hours'],
+            x=data['dates'],
             y=data['counts'],
             mode='lines',
             name=event_type.capitalize(),
@@ -51,12 +51,12 @@ async def create_events_plot():
         ))
 
     fig.update_layout(
-        title='Event Counts Over Time',
-        xaxis_title='Time (Hourly Intervals)',
+        title='Event Counts by Date',
+        xaxis_title='Date',
         yaxis_title='Count',
         legend_title='Event Type',
         xaxis=dict(
-            tickformat="%H:%M\n%b %d",
+            tickformat="%Y-%m-%d",
             tickmode="auto",
             nticks=20,
         )

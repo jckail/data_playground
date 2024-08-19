@@ -33,12 +33,11 @@ users_query = "SELECT partition_key, count(*) a, count(distinct id) b FROM users
 shops_query = "SELECT partition_key, count(*) a, count(distinct id) b FROM shops GROUP BY partition_key ORDER BY 1;"
 events_query = """
     SELECT event_time::timestamp::date AS event_date,
-           date_trunc('hour', event_time) AS hour,
            event_type,
            count(distinct event_id) as count
     FROM global_events
-    GROUP BY event_date, hour, event_type
-    ORDER BY hour;
+    GROUP BY event_date, event_type
+    ORDER BY event_date;
 """
 request_response_logs_query = """
     WITH recent_hour AS (

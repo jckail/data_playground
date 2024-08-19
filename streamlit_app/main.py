@@ -35,6 +35,7 @@ async def main():
     return users_shops_result, events_result, status_code_result
 
 def app_logic():
+    # Fetch data every time the page is refreshed
     users_shops_result, events_result, status_code_result = run_async(main())
 
     # Unpack the results
