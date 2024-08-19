@@ -2,6 +2,6 @@
 .venv/*
 *tempCodeRunnerFile.py
 *.pyc
-templates/*
-!templates/index.html
+app/templates/*
+!app/templates/index.html
 offlinenotes.txt
