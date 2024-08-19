@@ -5,15 +5,8 @@ from typing import List, Dict
 import httpx
 
 
-from app.utils.fake_data.new_fake_data_generator_models import User, generate_fake_user,  Shop, ActionCounter, BaseDataStore, BatchDataStore, OddsMaker
-from app.utils.fake_data.new_fake_data_generator_helpers import api_request, get_time, generate_event_time, check_api_connection, BASE_URL, logger
-
-    
-
-
-    
-
-
+from app.utils.fake_data.new_fake_data_generator_models import  BaseDataStore
+from app.utils.fake_data.new_fake_data_generator_helpers import  get_time
 
 
 async def main(base, current_date):  #TODO replace main with a daily that takes in a datastore and a date

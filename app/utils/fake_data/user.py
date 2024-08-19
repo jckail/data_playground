@@ -15,6 +15,8 @@ from .new_fake_data_generator_helpers import (
 from .shop import Shop
 
 
+#TODO: move this to actual app.models
+
 class User(BaseModel):
     id: uuid.UUID
     email: str
@@ -98,4 +100,16 @@ async def generate_fake_user(current_date: datetime, client: httpx.AsyncClient):
         return user
     else:
         logger.error(f"User creation failed for email: {user.email}")
+        return None
+    
+
+async def generate_users( n: int, current_date: datetime) -> List[User]:
+
+    ###TODO:  CREATE BATCHES OF 1000 -- this number can be too high for the api
+    if await check_api_connection(BASE_URL):
+        async with httpx.AsyncClient() as client:
+            processed_users = await asyncio.gather(*[generate_fake_user( current_date, client)  for _ in range(n)])
+        return [user for user in processed_users if user is not None]
+    else:
+        logger.warning("API connection failed. Returning unprocessed users.")
         return None

@@ -11,6 +11,8 @@ from .new_fake_data_generator_helpers import (
     logger,
 )
 
+
+#TODO: move this to actual app.models
 class Shop(BaseModel):
     id: uuid.UUID
     shop_owner_id: uuid.UUID
