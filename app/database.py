@@ -59,7 +59,7 @@ async def get_async_session_local():
         engine = await get_engine()
         AsyncSessionLocal = sessionmaker(
             autocommit=False,
-            autoflush=False,
+            autoflush=True,
             bind=engine,
             class_=AsyncSession
         )
@@ -70,7 +70,7 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
-semaphore = asyncio.Semaphore(10)
+semaphore = asyncio.Semaphore(25)
 
 async def execute_query(query: str, retries=3):
     for attempt in range(retries):
