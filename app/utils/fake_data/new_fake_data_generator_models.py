@@ -47,7 +47,6 @@ class Batch(BaseModel):
     del_shops: List[Shop] = Field(default_factory=list)
     active_users: List[Shop] = Field(default_factory=list)
     active_shops: List[Shop] = Field(default_factory=list)
-    om: OddsMaker = Field(default_factory=OddsMaker)
     start_time: datetime = Field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
     duration: Optional[timedelta] = None
@@ -186,9 +185,9 @@ class BaseDataStore(BaseModel):
             percentage = (count / len(active_user_list)) * 100 if active_user_list else 0
             logger.info(f"  Users with {i} shops: {count} ({percentage:.2f}%)")
 
-    def create_batch(self, om: OddsMaker):
+    def create_batch(self):
         """Create a new batch and reset batch counters."""
-        self.batch = Batch(om=om)
+        self.batch = Batch()
         self.batch.active_users = list(self.active_users.values())
         self.batch.active_shops = list(self.active_shops.values())
         self.batch.new_users = []
@@ -205,7 +204,7 @@ class BaseDataStore(BaseModel):
         :param om: The OddsMaker instance with a fixed seed for consistent randomness
         """
         try:
-            self.create_batch(om)
+            self.create_batch()
 
             self.batch.start()
             user_count = await om.generate_fake_user_growth_amount(self.active_users)

@@ -8,7 +8,7 @@ from ..utils.fake_data.new_fake_data_generator_models import (
 import pytz
 from ..models import OddsMaker
 from pydantic import BaseModel, Field
-
+import random
 
 router = APIRouter()
 
@@ -34,11 +34,11 @@ class FakeDataGenerator(BaseModel):
         ).replace(hour=23, minute=59, second=59, microsecond=999999)
     )
     max_fake_users_per_day: int = Field(
-        default=2500,
+        default=2000,
         description="Maximum number of fake users that can be created per day",
     )
     max_fake_shops_per_day: int = Field(
-        default=2000,
+        default=1500,
         description="Maximum number of fake shops that can be created per day",
     )
     max_user_growth_rate: float = Field(
@@ -67,8 +67,8 @@ class FakeDataGenerator(BaseModel):
             "example": {
                 "start_date": datetime.now(pytz.utc).date() - timedelta(days=15),
                 "end_date": datetime.now(pytz.utc).date() - timedelta(days=1),
-                "max_fake_users_per_day": 250,
-                "max_fake_shops_per_day": 200,
+                "max_fake_users_per_day": 2000,
+                "max_fake_shops_per_day": 1500,
 
                 "max_user_growth_rate": 0.2,
                 "max_shop_growth_rate": 0.2,
@@ -112,6 +112,8 @@ async def trigger_fake_data_generation(fdg: FakeDataGenerator) -> ActionCounter:
         shop_creation_chance=fdg.shop_creation_chance,
         user_churn_chance=fdg.user_churn_chance,
         shop_churn_chance=fdg.shop_churn_chance,
+        random_seed=42,
+        rng = random.Random(42)
     )
 
     try:
