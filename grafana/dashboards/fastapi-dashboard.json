@@ -1,0 +1,47 @@
+{
+    "dashboard": {
+      "id": null,
+      "uid": "example-dashboard",
+      "title": "FastAPI Metrics",
+      "tags": [],
+      "timezone": "browser",
+      "schemaVersion": 27,
+      "version": 0,
+      "refresh": "5s",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Request Rate",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total[5m])",
+              "format": "time_series"
+            }
+          ],
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 9
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Error Rate",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{status_code=~\"5..\"}[5m])",
+              "format": "time_series"
+            }
+          ],
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 9
+          }
+        }
+      ]
+    }
+  }
+  

@@ -27,7 +27,7 @@ async def generate_fake_data():
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                "http://127.0.0.1:8000/admin/generate_fake_data",
+                "http://127.0.0.1:8000/generate_fake_data",
                 json=payload,
                 timeout=30.0
             )

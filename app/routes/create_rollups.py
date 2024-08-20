@@ -34,7 +34,7 @@ logger.addHandler(handler)
 async def run_rollup(current_date, endpoint):
     event_time = current_date.isoformat()
     payload = {"event_time": event_time}
-    url = f"{BASE_URL}/admin/{endpoint}"
+    url = f"{BASE_URL}/{endpoint}"
     
     try:
         async with httpx.AsyncClient() as client:

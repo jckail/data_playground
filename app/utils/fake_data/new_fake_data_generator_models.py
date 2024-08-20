@@ -11,6 +11,7 @@ from .new_fake_data_generator_helpers import logger
 from .odds_maker import OddsMaker
 from .user import User, Shop
 from .user_actions import generate_users, generate_shops, deactivate_shops, deactivate_users
+from .call_rollups import call_user_snapshot_api
 
 def make_list_unique(input_list: list) -> list:
     """
@@ -112,6 +113,7 @@ class BaseDataStore(BaseModel):
             self._log_daily_changes(current_date)
 
             self.all_batch[current_date] = self.batch
+
 
             # Log additional metrics
             self._log_additional_metrics()
@@ -229,7 +231,9 @@ class BaseDataStore(BaseModel):
 
             self.batch.end()
             logger.info(f"Day processing completed in {self.batch.duration}")
-
+            
+            await call_user_snapshot_api(current_date)
+            
             self.post_batch_update(current_date)
         except Exception as e:
             logger.error(f"Error in process_day: {str(e)}")

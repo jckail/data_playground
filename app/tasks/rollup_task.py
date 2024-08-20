@@ -1,4 +1,4 @@
-from .. routes.admin import create_rollups
+from ..routes.create_rollups import create_rollups
 import logging
 from datetime import datetime
 from ..database import get_db
