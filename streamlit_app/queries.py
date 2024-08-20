@@ -29,8 +29,8 @@ async def execute_query(query: str, retries=3):
                 raise e
 
 # Define your SQL queries
-users_query = "SELECT partition_key, count(*) a, count(distinct id) b FROM users GROUP BY partition_key ORDER BY 1;"
-shops_query = "SELECT partition_key, count(*) a, count(distinct id) b FROM shops GROUP BY partition_key ORDER BY 1;"
+users_query = "SELECT created_time::timestamp::date AS partition_key,count(distinct id) b FROM users GROUP BY  created_time::timestamp::date ORDER BY 1;"
+shops_query = "SELECT created_time::timestamp::date AS partition_key,count(distinct id) b FROM shops GROUP BY  created_time::timestamp::date ORDER BY 1;"
 events_query = """
     SELECT event_time::timestamp::date AS event_date,
            event_type,

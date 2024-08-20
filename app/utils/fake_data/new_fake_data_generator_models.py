@@ -10,7 +10,7 @@ from ...models.odds_maker import OddsMaker
 from .user import User, Shop
 from .user_actions import generate_users, generate_shops, deactivate_shops, deactivate_users
 from .call_rollups import call_user_snapshot_api, call_shop_snapshot_api
-
+import random
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -186,9 +186,9 @@ class BaseDataStore(BaseModel):
             percentage = (count / len(active_user_list)) * 100 if active_user_list else 0
             logger.info(f"  Users with {i} shops: {count} ({percentage:.2f}%)")
 
-    def create_batch(self):
+    def create_batch(self, om: OddsMaker):
         """Create a new batch and reset batch counters."""
-        self.batch = Batch()
+        self.batch = Batch(om=om)
         self.batch.active_users = list(self.active_users.values())
         self.batch.active_shops = list(self.active_shops.values())
         self.batch.new_users = []
@@ -197,51 +197,57 @@ class BaseDataStore(BaseModel):
         self.batch.del_shops = []
         logger.info("New batch created and counters reset")
 
-    async def process_day(self, current_date: datetime, om = OddsMaker()):
+    async def process_day(self, current_date: datetime, om: OddsMaker):
         """
         Process a day's worth of user and shop activities.
 
         :param current_date: The date to process
+        :param om: The OddsMaker instance with a fixed seed for consistent randomness
         """
         try:
-            self.create_batch()
-
-            if om:
-                self.batch.om = om
+            self.create_batch(om)
 
             self.batch.start()
-            user_count = await self.batch.om.generate_fake_user_growth_amount(self.active_users)
+            user_count = await om.generate_fake_user_growth_amount(self.active_users)
 
             self.batch.new_users = await generate_users(user_count, current_date)
             logger.info(f"Generated {len(self.batch.new_users)} new users")
 
-            new_shop_users = await self.batch.om.generate_fake_shop_growth(self.batch.new_users, self.batch.active_shops)
+
+
+            
+            new_shop_users = await om.generate_fake_shop_growth(self.batch.new_users, self.batch.active_shops)
             self.batch.new_shops = await generate_shops(new_shop_users, user_count, current_date)
             logger.info(f"Generated {len(self.batch.new_shops)} new shops from new users")
 
-            new_shop_users = await self.batch.om.generate_fake_shop_growth(self.batch.active_users, self.batch.active_shops)
+
+            
+            new_shop_users = await om.generate_fake_shop_growth(self.batch.active_users, self.batch.active_shops)
             additional_shops = await generate_shops(new_shop_users, user_count, current_date)
             self.batch.new_shops += additional_shops
             logger.info(f"Generated {len(additional_shops)} additional new shops from active users")
 
-            shop_churn_list = await self.batch.om.generate_fake_shop_churn(self.batch.active_shops)
+            
+            shop_churn_list = await om.generate_fake_shop_churn(self.batch.active_shops)
             within_deactivated_shops = await deactivate_shops(shop_churn_list, user_count, current_date)
             logger.info(f"Deactivated {len(within_deactivated_shops)} shops")
 
-            users_to_deactivate = await self.batch.om.generate_fake_user_churn(self.batch.active_users)
+            
+            users_to_deactivate = await om.generate_fake_user_churn(self.batch.active_users)
             del_users, deactivated_shops = await deactivate_users(users_to_deactivate, user_count, current_date)
             logger.info(f"Deactivated {len(del_users)} users and {len(deactivated_shops)} associated shops")
 
+            
             self.batch.del_users = del_users
             self.batch.del_shops = [shop for shop in (within_deactivated_shops + deactivated_shops) if shop is not None]
 
             self.batch.end()
             logger.info(f"Day processing completed in {self.batch.duration}")
             
-            await asyncio.gather(
-                call_user_snapshot_api(current_date),
-                call_shop_snapshot_api(current_date)
-            )
+            # await asyncio.gather(
+            #     call_user_snapshot_api(current_date),
+            #     call_shop_snapshot_api(current_date)
+            # )
             
             self.post_batch_update(current_date)
         except Exception as e:
@@ -452,10 +458,14 @@ class BaseDataStore(BaseModel):
             logger.error(f"Error loading state from {filename}: {str(e)}")
             return None
         
-    async def process_date_range(self, start_date: datetime, end_date: datetime, om = OddsMaker()):
+    async def process_date_range(self, start_date: datetime, end_date: datetime, om: OddsMaker):
         current_date = start_date
         while current_date <= end_date:
-            print(f"Processing date: {current_date.date()}")
+            # Generate a new random seed for each day
+            random_seed = random.randint(0, 2**32 - 1)
+            om.set_random_seed(random_seed)
+            
+            print(f"Processing date: {current_date.date()} with seed: {random_seed}")
             await self.process_day(current_date, om)
             current_date += timedelta(days=1)
         self.analyze_trends()

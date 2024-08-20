@@ -18,6 +18,12 @@ class OddsMaker(BaseModel):
     user_churn_chance: float = Field(default=0.2, description="Probability of a user churning")
     shop_churn_chance: float = Field(default=0.3, description="Probability of a shop churning")
     shops_to_generate: int = Field(default_factory=lambda: int(random.uniform(0, 2000)), description="Number of shops to generate")
+    random_seed: int = Field(default=42, description="Seed for random number generator")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize the random generator with the seed
+        self.rng = random.Random(self.random_seed)
 
     async def gen_prop(self, p_list: List, propensity: float, max_value: int = None, r: bool = False) -> int:
         """
@@ -34,13 +40,13 @@ class OddsMaker(BaseModel):
             if population == 0:
                 return max_value or 0
 
-            if not max_value:
-                max_value = population
-
             if r:
-                propensity = random.uniform(0, propensity)
+                propensity = self.rng.uniform(0, propensity)
 
-            return min(int(population * propensity), max_value)
+            generated_value = int(population * propensity)
+            if max_value is not None:
+                return min(generated_value, max_value)
+            return generated_value
         except Exception as e:
             logger.error(f"Error in gen_prop: {str(e)}")
             return 0
@@ -53,8 +59,7 @@ class OddsMaker(BaseModel):
         :return: The randomized list
         """
         try:
-            for _ in range(int(random.uniform(1, 3))):
-                random.shuffle(input_list)
+            self.rng.shuffle(input_list)
             return input_list
         except Exception as e:
             logger.error(f"Error in list_randomizer: {str(e)}")
@@ -84,8 +89,7 @@ class OddsMaker(BaseModel):
         """
         try:
             num_users_to_del = await self.gen_prop(user_list, self.user_churn_chance, self.max_fake_users_per_day)
-            user_list = await self.list_randomizer(user_list)
-            churn_list = user_list[:num_users_to_del]
+            churn_list = self.rng.sample(user_list, num_users_to_del)
             logger.info(f"Generated {len(churn_list)} users to churn")
             return churn_list
         except Exception as e:
@@ -102,8 +106,7 @@ class OddsMaker(BaseModel):
         """
         try:
             num_shops_to_create = await self.gen_prop(shop_list, self.max_shop_growth_rate, self.max_fake_shops_per_day)
-            user_list = await self.list_randomizer(user_list)
-            shop_creators = user_list[:num_shops_to_create]
+            shop_creators = self.rng.sample(user_list, num_shops_to_create)
             logger.info(f"Generated {len(shop_creators)} users to create new shops")
             return shop_creators
         except Exception as e:
@@ -119,10 +122,14 @@ class OddsMaker(BaseModel):
         """
         try:
             num_shops_to_del = await self.gen_prop(shop_list, self.shop_churn_chance, self.max_fake_shops_per_day)
-            shop_list = await self.list_randomizer(shop_list)
-            churn_list = shop_list[:num_shops_to_del]
+            churn_list = self.rng.sample(shop_list, num_shops_to_del)
             logger.info(f"Generated {len(churn_list)} shops to churn")
             return churn_list
         except Exception as e:
             logger.error(f"Error in generate_fake_shop_churn: {str(e)}")
             return []
+
+    def set_random_seed(self, seed: int):
+        """Set the random seed for this OddsMaker instance."""
+        self.random_seed = seed
+        random.seed(self.random_seed)

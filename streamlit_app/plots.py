@@ -6,7 +6,7 @@ async def create_users_shops_plot():
     users_data = await execute_query(users_query)
     shops_data = await execute_query(shops_query)
 
-    dates = [datetime.strptime(row['partition_key'], '%Y-%m-%d').date() for row in users_data]
+    dates = [row['partition_key'] for row in users_data]
     users_counts = [row['b'] for row in users_data]
     shops_counts = [row['b'] for row in shops_data]
 
