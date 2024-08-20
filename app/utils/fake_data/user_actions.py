@@ -5,12 +5,12 @@ from typing import List, Dict, Optional, Tuple
 import httpx
 from pydantic import BaseModel, Field
 
-from .new_fake_data_generator_helpers import (
+from ...routes.api_helpers import (
     BASE_URL,
     logger,
     check_api_connection
 )
-from .odds_maker import OddsMaker
+from ...models.odds_maker import OddsMaker
 from .user import User, Shop, generate_fake_user
 
 async def process_in_chunks(tasks, chunk_size=200):

@@ -6,21 +6,6 @@ from ..database import get_db
 import logging
 from app.utils.helpers import post_request, BASE_URL
 import httpx
-from sqlalchemy.orm import Session
-from ..utils.generate_fake_data import generate_fake_data
-from datetime import  date
-import pytz
-
-
-from ..models import EventPropensity, FakeHelper, User, Shop
-import time
-from ..schemas import FakeDataQuery, UserSnapshot, UserSnapshotResponse, ShopSnapshot, ShopSnapshotResponse
-from ..database import get_db
-
-
-
-
-
 
 router = APIRouter()
 
@@ -96,44 +81,3 @@ async def create_rollups(
         raise HTTPException(status_code=500, detail=f"Failed to create rollups: {str(e)}")
 
 
-
-# @router.post("/generate_fake_data")
-# async def trigger_fake_data_generation(
-#     fdq: FakeDataQuery,  # Use the schema defined in schemas.py
-#     background_tasks: BackgroundTasks,
-#     db: Session = Depends(get_db),
-# ):
-#     logger.info(f"Triggering fake data generation for date range {fdq.start_date} to {fdq.end_date}")
-
-#     yesterday = datetime.now(pytz.utc).date() - timedelta(minutes=1)
-
-#     if fdq.start_date.date() > yesterday:
-#         logger.warning(f"Start date {fdq.start_date} cannot be later than yesterday {yesterday}")
-#         raise HTTPException(
-#             status_code=400, detail="Start date cannot be later than yesterday"
-#         )
-
-#     try:
-#         result_summary = await run_data_generation(
-#             fdq.start_date,
-#             fdq.end_date,
-#             fdq.max_fake_users_per_day,
-#             fdq.max_user_churn,
-#             fdq.max_first_shop_creation_percentage,
-#             fdq.max_multiple_shop_creation_percentage,
-#             fdq.max_shop_churn,
-#         )
-#     except Exception as e:
-#         logger.error(f"Data generation failed: {str(e)}")
-#         raise HTTPException(
-#             status_code=500, detail=f"Data generation failed: {str(e)}"
-#         )
-
-#     logger.info(f"Fake data generation completed successfully for {fdq.start_date} to {fdq.end_date}")
-    
-#     return {
-#         "message": "Fake data generation completed",
-#         "start_date": fdq.start_date.isoformat(),
-#         "end_date": fdq.end_date.isoformat(),
-#         "summary": result_summary,
-#     }

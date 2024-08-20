@@ -4,7 +4,7 @@ from typing import  Optional
 from pydantic import BaseModel
 
 
-from .new_fake_data_generator_helpers import (
+from ...routes.api_helpers import (
     api_request,
     generate_event_time,
     BASE_URL,

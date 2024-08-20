@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, Request, Response, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from .routes import create_rollups, users, events, shops, invoices, payments, user_snapshot, shop_snapshot
+from .routes import create_rollups, users, events, shops, invoices, payments, user_snapshot, shop_snapshot, generate_fake_data
 from app.core.scheduler import run_scheduler
 import threading
 from .tasks.fake_data_generator import run_async_generate_fake_data
@@ -39,6 +39,7 @@ app.include_router(events.router)
 app.include_router(create_rollups.router)
 app.include_router(user_snapshot.router)
 app.include_router(shop_snapshot.router)
+app.include_router(generate_fake_data.router)
 
 # Prometheus metrics
 REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP Requests')
@@ -125,8 +126,8 @@ async def shutdown_event():
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/trigger_fake_data")
-async def trigger_fake_data(background_tasks: BackgroundTasks):
+@app.post("/auto_refresh_fake_data")
+async def auto_refresh_fake_data(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_async_generate_fake_data)
     return {"message": "Fake data generation triggered"}
 

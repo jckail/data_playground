@@ -7,19 +7,27 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def generate_fake_data():
+
+
+async def task_generate_fake_data():
     current_time = datetime.now(pytz.utc)
     start_date = current_time - timedelta(minutes=5)  
     end_date = current_time
 
     payload = {
+        "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
-        "max_fake_users_per_day": random.randint(1, 100),
-        "max_first_shop_creation_percentage": 0.8,
-        "max_multiple_shop_creation_percentage": 0.1,
-        "max_shop_churn": 0.05,
-        "max_user_churn": 0.01,
-        "start_date": start_date.isoformat()
+                "max_fake_users_per_day": 100,
+                "max_fake_shops_per_day": 100,
+
+                "max_user_growth_rate": 0.2,
+                "max_shop_growth_rate": 0.2,
+
+                "user_shop_population": 0.5,
+                "shop_creation_chance": 0.8,
+                
+                "user_churn_chance": 0.2,
+                "shop_churn_chance": 0.3,
     }
 
     logger.info(f"Sending payload to generate fake data: {payload}")
@@ -43,4 +51,4 @@ async def generate_fake_data():
             logger.error(f"An unexpected error occurred: {e}")
 
 def run_async_generate_fake_data():
-    asyncio.run(generate_fake_data())
+    asyncio.run(task_generate_fake_data())

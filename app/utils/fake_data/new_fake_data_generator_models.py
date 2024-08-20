@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta
 import uuid
 from typing import List, Dict, Optional
@@ -7,11 +6,14 @@ import os
 import json
 import logging
 
-from .new_fake_data_generator_helpers import logger
-from .odds_maker import OddsMaker
+from ...models.odds_maker import OddsMaker
 from .user import User, Shop
 from .user_actions import generate_users, generate_shops, deactivate_shops, deactivate_users
-from .call_rollups import call_user_snapshot_api
+from .call_rollups import call_user_snapshot_api, call_shop_snapshot_api
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def make_list_unique(input_list: list) -> list:
     """
@@ -195,7 +197,7 @@ class BaseDataStore(BaseModel):
         self.batch.del_shops = []
         logger.info("New batch created and counters reset")
 
-    async def process_day(self, current_date: datetime):
+    async def process_day(self, current_date: datetime, om = OddsMaker()):
         """
         Process a day's worth of user and shop activities.
 
@@ -203,6 +205,10 @@ class BaseDataStore(BaseModel):
         """
         try:
             self.create_batch()
+
+            if om:
+                self.batch.om = om
+
             self.batch.start()
             user_count = await self.batch.om.generate_fake_user_growth_amount(self.active_users)
 
@@ -232,7 +238,8 @@ class BaseDataStore(BaseModel):
             self.batch.end()
             logger.info(f"Day processing completed in {self.batch.duration}")
             
-            await call_user_snapshot_api(current_date)
+            # await call_user_snapshot_api(current_date)
+            # await call_shop_snapshot_api(current_date)
             
             self.post_batch_update(current_date)
         except Exception as e:
@@ -442,3 +449,12 @@ class BaseDataStore(BaseModel):
         except Exception as e:
             logger.error(f"Error loading state from {filename}: {str(e)}")
             return None
+        
+    async def process_date_range(self, start_date: datetime, end_date: datetime, om = OddsMaker()):
+        current_date = start_date
+        while current_date <= end_date:
+            print(f"Processing date: {current_date.date()}")
+            await self.process_day(current_date, om)
+            current_date += timedelta(days=1)
+        self.analyze_trends()
+        return self.action_counter

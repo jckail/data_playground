@@ -47,6 +47,24 @@
             }
           },
 
+          {
+            "datasource": "Prometheus",
+            "type": "graph",
+            "title": "http_requests_total_create_shop_total",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total_create_shop_total[5m])",
+                "format": "time_series"
+              }
+            ],
+            "gridPos": {
+              "x": 0,
+              "y": 0,
+              "w": 12,
+              "h": 9
+            }
+          },
+
       {
         "aliasColors": {},
         "bars": false,
