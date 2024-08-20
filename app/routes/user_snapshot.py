@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from ..database import get_db
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..models import User
 from ..schemas import UserSnapshot, UserSnapshotResponse
@@ -18,6 +20,9 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 
+def generate_partition_name(tablename, partition_key):
+    return f"{tablename}_p_{partition_key.replace('-', '_')}"
+
 @router.post("/user_snapshot", response_model=UserSnapshotResponse)
 async def user_snapshot(
     snapshot: UserSnapshot, db: AsyncSession = Depends(get_db)
@@ -29,8 +34,14 @@ async def user_snapshot(
         partition_key = event_time.date()
         previous_day = partition_key - timedelta(days=1)
 
-        rows = await fetch_user_data(db, partition_key, previous_day)
-        await process_user_data(db, rows, partition_key, event_time)
+        # Delete the current day's partition from users
+        await delete_current_partition(db, partition_key)
+
+        # Ensure partition exists
+        await ensure_partition_exists(db, partition_key)
+
+        # Fetch user data and insert into users table
+        await fetch_and_insert_user_data(db, partition_key, previous_day, event_time)
 
         users_processed = await get_users_processed_count(db, partition_key)
         logger.info(f"User snapshot generation complete for partition_key {partition_key}. Users processed: {users_processed}")
@@ -46,63 +57,98 @@ async def user_snapshot(
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"User snapshot failed: {str(e)}")
 
-@retry_with_backoff()
-async def fetch_user_data(db: AsyncSession, partition_key: datetime.date, previous_day: datetime.date):
+
+async def delete_current_partition(db: AsyncSession, partition_key: date):
     try:
-        logger.info(f"Fetching user data for partition_key {partition_key} and previous_day {previous_day}")
+        partition_key_str = partition_key.strftime('%Y-%m-%d')
+        logger.info(f"Deleting current day's partition for {partition_key_str}")
+        
+        delete_query = text("DELETE FROM users WHERE partition_key = :partition_key")
+        await db.execute(delete_query, {"partition_key": partition_key_str})
+        await db.commit()
+        
+        logger.info(f"Deleted partition for {partition_key_str}")
+
+    except Exception as e:
+        logger.error(f"Error deleting partition for {partition_key_str}: {str(e)}")
+        await db.rollback()
+        raise
+
+
+async def ensure_partition_exists(db: AsyncSession, partition_key: date):
+    partition_name = generate_partition_name("users", partition_key.strftime('%Y_%m_%d')).lower()
+    start_date = partition_key.strftime('%Y-%m-%d')
+    end_date = (partition_key + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    create_query = f"""
+    CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF users
+    FOR VALUES FROM ('{start_date}') TO ('{end_date}');
+    """
+    
+    try:
+        await db.execute(text(create_query))
+        await db.commit()
+        logger.info(f"Ensured partition {partition_name} exists")
+    except ProgrammingError as e:
+        if 'already exists' in str(e):
+            logger.info(f"Partition {partition_name} already exists")
+        else:
+            logger.error(f"Error ensuring partition {partition_name} exists: {str(e)}")
+            await db.rollback()
+            raise
+
+
+async def fetch_and_insert_user_data(db: AsyncSession, partition_key: date, previous_day: date, event_time: datetime):
+    try:
+        logger.info(f"Fetching and inserting user data for partition_key {partition_key} and previous_day {previous_day}")
 
         query = f"""
+            INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key, event_time)
             WITH base AS (
                 SELECT 
                     event_metadata->>'user_id' AS id,
                     event_metadata->>'email' AS email,
                     event_time as created_time,
-                    NULL as deactivated_time     
+                    NULL as deactivated_time,
+                    event_time::timestamp
                 FROM global_events
                 WHERE event_type = 'user_account_creation'
-                AND event_time::date = '{partition_key}'::date
-                
+                AND event_time::date = '{partition_key}'
+            
                 UNION ALL 
-                
+            
                 SELECT 
                     event_metadata->>'user_id' AS id,
                     event_metadata->>'email' AS email,
                     NULL as created_time,
-                    event_time as deactivated_time     
+                    event_time as deactivated_time,
+                    event_time::timestamp
                 FROM global_events
                 WHERE event_type = 'user_delete_account'
-                AND event_time::date = '{partition_key}'::date
-                
+                AND event_time::date = '{partition_key}'
+            
                 UNION ALL 
-                
+            
                 SELECT 
                     id::text,
                     email,
                     created_time,
-                    deactivated_time    
+                    deactivated_time,
+                    event_time::timestamp
                 FROM users
-                WHERE partition_key::date = '{previous_day}'::date
-
-                UNION ALL 
-                
-                SELECT 
-                    id::text,
-                    email,
-                    created_time,
-                    deactivated_time    
-                FROM users
-                WHERE partition_key::date = '{partition_key}'::date
+                WHERE partition_key::date = '{previous_day}'
             ),
             base2 AS (
                 SELECT 
                     id,
                     email,
                     MAX(created_time) AS created_time,
-                    MAX(deactivated_time) AS deactivated_time   
+                    MAX(deactivated_time) AS deactivated_time,
+                    MAX(event_time) AS event_time
                 FROM base
-                WHERE id is not null
-                AND email is not null
-                GROUP BY id, email  
+                WHERE id IS NOT NULL
+                AND email IS NOT NULL
+                GROUP BY id, email
             )
             SELECT 
                 DISTINCT 
@@ -111,109 +157,26 @@ async def fetch_user_data(db: AsyncSession, partition_key: datetime.date, previo
                 CASE WHEN deactivated_time IS NULL THEN TRUE ELSE FALSE END AS status,
                 created_time,
                 deactivated_time,
-                '{partition_key}'::date AS partition_key
+                '{partition_key}' AS partition_key,
+                event_time
             FROM base2
         """
 
-        result = await db.execute(text(query))
-        rows = result.fetchall()  # Note: fetchall() is not awaited because it returns a list, not a coroutine
-        logger.info(f"Fetched {len(rows)} rows for user snapshot")
-        return rows
-
-    except Exception as e:
-        logger.error(f"Error fetching user data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching user data: {str(e)}")
-
-async def process_user_data(db: AsyncSession, rows, partition_key: datetime.date, event_time: datetime):
-    try:
-        logger.info(f"Processing {len(rows)} rows of user data")
-
-        update_query = text("""
-            INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key, event_time)
-            VALUES (:id, :email, :status, :created_time, :deactivated_time, :partition_key, :event_time)
-            ON CONFLICT (id, partition_key)
-            DO UPDATE SET
-                email = EXCLUDED.email,
-                status = EXCLUDED.status,
-                created_time = COALESCE(users.created_time, EXCLUDED.created_time),
-                deactivated_time = COALESCE(EXCLUDED.deactivated_time, users.deactivated_time),
-                event_time = EXCLUDED.event_time
-            RETURNING id
-        """)
-
-        for i, row in enumerate(rows):
-            try:
-                logger.debug(f"Processing row {i+1}/{len(rows)}: {row}")
-
-                # Await the `validate_partition` coroutine
-                new_record = await User.validate_partition(
-                    db=db,
-                    id=row.id,
-                    email=row.email,
-                    status=row.status,
-                    created_time=row.created_time,
-                    deactivated_time=row.deactivated_time,
-                    event_time=event_time,
-                )
-
-                # Convert partition_key to string
-                partition_key_str = partition_key.isoformat()
-
-                existing_record_query = await db.execute(
-                    text("SELECT * FROM users WHERE id = :id AND partition_key = :partition_key"),
-                    {"id": new_record.id, "partition_key": partition_key_str}
-                )
-                existing_record = existing_record_query.fetchone()
-
-                if existing_record:
-                    logger.debug(f"Updating existing user record with ID: {new_record.id}")
-                    await db.execute(
-                        update_query,
-                        {
-                            "id": new_record.id,
-                            "email": new_record.email,
-                            "status": new_record.status,
-                            "created_time": new_record.created_time,
-                            "deactivated_time": new_record.deactivated_time,
-                            "partition_key": partition_key_str,
-                            "event_time": new_record.event_time,
-                        }
-                    )
-                else:
-                    logger.debug(f"Creating new user record with ID: {new_record.id}")
-                    await db.execute(
-                        text("""
-                            INSERT INTO users (id, email, status, created_time, deactivated_time, partition_key, event_time)
-                            VALUES (:id, :email, :status, :created_time, :deactivated_time, :partition_key, :event_time)
-                        """),
-                        {
-                            "id": new_record.id,
-                            "email": new_record.email,
-                            "status": new_record.status,
-                            "created_time": new_record.created_time,
-                            "deactivated_time": new_record.deactivated_time,
-                            "partition_key": partition_key_str,
-                            "event_time": new_record.event_time,
-                        }
-                    )
-
-            except Exception as row_error:
-                logger.error(f"Error processing row {i+1}/{len(rows)}: {str(row_error)}")
-                raise
-
+        await db.execute(text(query))
         await db.commit()
-        logger.info("User data processing and commit successful")
+        
+        logger.info("User data inserted successfully")
 
     except Exception as e:
-        logger.error(f"Error processing user data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing user data: {str(e)}")
+        logger.error(f"Error fetching and inserting user data: {str(e)}")
+        await db.rollback()
+        raise
 
-@retry_with_backoff()
-async def get_users_processed_count(db: AsyncSession, partition_key: datetime.date) -> int:
+
+async def get_users_processed_count(db: AsyncSession, partition_key: date) -> int:
     try:
         logger.info(f"Counting users processed for partition_key {partition_key}")
         
-        # Convert the date to a string in 'YYYY-MM-DD' format
         partition_key_str = partition_key.strftime('%Y-%m-%d')
         
         result = await db.execute(
@@ -226,4 +189,4 @@ async def get_users_processed_count(db: AsyncSession, partition_key: datetime.da
 
     except Exception as e:
         logger.error(f"Error counting processed users: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error counting processed users: {str(e)}")
+        raise

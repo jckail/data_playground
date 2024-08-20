@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 import os
 import json
 import logging
-
+import asyncio
 from ...models.odds_maker import OddsMaker
 from .user import User, Shop
 from .user_actions import generate_users, generate_shops, deactivate_shops, deactivate_users
@@ -238,8 +238,10 @@ class BaseDataStore(BaseModel):
             self.batch.end()
             logger.info(f"Day processing completed in {self.batch.duration}")
             
-            # await call_user_snapshot_api(current_date)
-            # await call_shop_snapshot_api(current_date)
+            await asyncio.gather(
+                call_user_snapshot_api(current_date),
+                call_shop_snapshot_api(current_date)
+            )
             
             self.post_batch_update(current_date)
         except Exception as e:

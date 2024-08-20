@@ -3,8 +3,9 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# Get the database URL from environment variable
-db_url = os.getenv('DATABASE_URL')
+# Get the database URL from environment variable and convert it to psycopg2 format
+db_url = os.getenv('DATABASE_URL', 'postgresql+asyncpg://user:password@db/dbname')
+db_url = db_url.replace('postgresql+asyncpg://', 'postgresql://')
 
 def run_query(query):
     try:

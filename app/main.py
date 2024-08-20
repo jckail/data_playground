@@ -132,41 +132,41 @@ async def auto_refresh_fake_data(background_tasks: BackgroundTasks):
     return {"message": "Fake data generation triggered"}
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    async for db in get_db():
-        method = request.method
-        url = str(request.url)
+# @app.middleware("http")
+# async def log_requests(request: Request, call_next):
+#     async for db in get_db():
+#         method = request.method
+#         url = str(request.url)
 
-        try:
-            request_body = await request.body()
-        except Exception:
-            request_body = b''
+#         try:
+#             request_body = await request.body()
+#         except Exception:
+#             request_body = b''
 
-        response = await call_next(request)
+#         response = await call_next(request)
 
-        status_code = response.status_code
-        try:
-            response_body = b"".join([chunk async for chunk in response.body_iterator])
-        except Exception:
-            response_body = b''
+#         status_code = response.status_code
+#         try:
+#             response_body = b"".join([chunk async for chunk in response.body_iterator])
+#         except Exception:
+#             response_body = b''
 
-        try:
-            log_entry = await RequestResponseLog.create_with_partition(
-                db,
-                method=method,
-                url=url,
-                request_body=request_body.decode('utf-8'),
-                response_body=response_body.decode('utf-8'),
-                status_code=status_code,
-                event_time=await parse_event_time(datetime.utcnow().replace(tzinfo=pytz.UTC))
-            )
+#         try:
+#             log_entry = await RequestResponseLog.create_with_partition(
+#                 db,
+#                 method=method,
+#                 url=url,
+#                 request_body=request_body.decode('utf-8'),
+#                 response_body=response_body.decode('utf-8'),
+#                 status_code=status_code,
+#                 event_time=await parse_event_time(datetime.utcnow().replace(tzinfo=pytz.UTC))
+#             )
 
-            db.add(log_entry)
-            await db.commit()
-        except Exception as e:
-            logger.error(f"Failed to log request/response: {e}")
-        finally:
-            await db.close()
+#             db.add(log_entry)
+#             await db.commit()
+#         except Exception as e:
+#             logger.error(f"Failed to log request/response: {e}")
+#         finally:
+#             await db.close()
 
-    return Response(content=response_body, status_code=status_code, headers=dict(response.headers))
+#     return Response(content=response_body, status_code=status_code, headers=dict(response.headers))

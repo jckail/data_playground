@@ -13,6 +13,7 @@ COPY ./app /code/app
 
 # Copy the wait_for_db script
 COPY ./wait_for_db.py /code/wait_for_db.py
+COPY ./run_query.py /code/run_query.py
 
 # Copy Alembic configuration and migration scripts
 COPY ./alembic.ini /code/alembic.ini
