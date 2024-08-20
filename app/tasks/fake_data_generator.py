@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 async def task_generate_fake_data():
     current_time = datetime.now(pytz.utc)
-    start_date = current_time - timedelta(day=1)  
+    start_date = current_time - timedelta(days=1)  
     end_date = current_time
 
     payload = {
