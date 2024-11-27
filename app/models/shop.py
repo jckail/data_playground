@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, UUID
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, UUID, Index
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -20,9 +20,23 @@ class FakeUserShop(Base, PartitionedModel):
     """
     Represents a shop owned by a fake user. Shops can sell products,
     process orders, manage inventory, and handle customer interactions.
+    
+    Indexing Strategy:
+    - Primary key (id) is automatically indexed
+    - shop_category is indexed for filtering shops by category
+    - status is indexed for filtering active/inactive shops
+    - fake_user_owner_id is indexed for owner-based queries
+    - created_time is indexed for time-based queries
+    - event_time is indexed for partitioning
+    - Composite indexes for common query patterns
+    
+    Partitioning Strategy:
+    - Hourly partitioning based on event_time for efficient querying of recent data
+    - Each partition contains one hour of data
+    - Older partitions can be archived or dropped based on retention policy
     """
     __tablename__ = 'fake_user_shops'
-    __partitiontype__ = "daily"
+    __partitiontype__ = "hourly"  # Changed from daily to hourly
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -35,11 +49,13 @@ class FakeUserShop(Base, PartitionedModel):
     fake_user_owner_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
+        index=True,  # Added index
         comment="ID of the user who owns this shop"
     )
     shop_name = Column(
         String(255), 
         nullable=False,
+        index=True,  # Added index
         comment="Display name of the shop"
     )
     shop_description = Column(
@@ -51,12 +67,14 @@ class FakeUserShop(Base, PartitionedModel):
         Enum(ShopCategory), 
         nullable=False, 
         default=ShopCategory.OTHER,
+        index=True,  # Added index
         comment="Primary category of the shop's business"
     )
     status = Column(
         Boolean, 
         nullable=False, 
         default=True,
+        index=True,  # Added index
         comment="Shop status (true=active, false=inactive)"
     )
     
@@ -74,21 +92,25 @@ class FakeUserShop(Base, PartitionedModel):
     city = Column(
         String(100), 
         nullable=True,
+        index=True,  # Added index
         comment="City where the shop is located"
     )
     state = Column(
         String(100), 
         nullable=True,
+        index=True,  # Added index
         comment="State/province where the shop is located"
     )
     postal_code = Column(
         String(20), 
         nullable=True,
+        index=True,  # Added index
         comment="Postal/ZIP code"
     )
     country = Column(
         String(100), 
         nullable=True,
+        index=True,  # Added index
         comment="Country where the shop is located"
     )
     
@@ -97,17 +119,20 @@ class FakeUserShop(Base, PartitionedModel):
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
+        index=True,  # Added index
         comment="When the shop was created"
     )
     deactivated_time = Column(
         DateTime(timezone=True),
         nullable=True,
+        index=True,  # Added index
         comment="When the shop was deactivated (if applicable)"
     )
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
+        index=True,  # Added index
         comment="Timestamp used for partitioning"
     )
     
@@ -184,16 +209,32 @@ class FakeUserShop(Base, PartitionedModel):
         lazy="dynamic"
     )
 
+    # Indexes for common queries
     __table_args__ = (
+        # Composite index for status and category for filtering active shops by category
+        Index('ix_fake_user_shops_status_category', 'status', 'shop_category'),
+        
+        # Composite index for owner and status for filtering owner's active shops
+        Index('ix_fake_user_shops_owner_status', 'fake_user_owner_id', 'status'),
+        
+        # Composite index for location-based queries
+        Index('ix_fake_user_shops_location', 'country', 'state', 'city'),
+        
+        # Composite index for status and created_time for filtering active shops by creation date
+        Index('ix_fake_user_shops_status_created', 'status', 'created_time'),
+        
+        # Foreign key constraint
         ForeignKeyConstraint(
             ['fake_user_owner_id'], ['data_playground.fake_users.id'],
             name='fk_fake_user_shop_owner',
             comment="Foreign key relationship to the fake_users table"
         ),
+        
+        # Partitioning configuration
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
             'schema': 'data_playground',
-            'comment': 'Stores shop data for fake users'
+            'comment': 'Stores shop data with hourly partitioning for efficient querying'
         }
     )
 

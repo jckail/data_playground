@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, UUID
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, UUID, Index
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -145,9 +145,21 @@ class GlobalEvent(Base, PartitionedModel):
     """
     Tracks all significant events in the system, providing a comprehensive audit trail
     and enabling system-wide monitoring and analysis.
+    
+    Indexing Strategy:
+    - Primary key (event_id) is automatically indexed
+    - event_type is indexed for filtering specific types of events
+    - fake_user_id is indexed for user-specific event queries
+    - event_time is indexed for time-based queries and partitioning
+    - Composite indexes for common query patterns
+    
+    Partitioning Strategy:
+    - Hourly partitioning based on event_time for efficient querying of recent events
+    - Each partition contains one hour of data
+    - Older partitions can be archived or dropped based on retention policy
     """
     __tablename__ = "global_events"
-    __partitiontype__ = "hourly"
+    __partitiontype__ = "hourly"  # Already set to hourly
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -160,11 +172,13 @@ class GlobalEvent(Base, PartitionedModel):
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False,
+        index=True,  # Added index
         comment="Timestamp when the event occurred (with timezone)"
     )
     event_type = Column(
         Enum(EventType), 
         nullable=False,
+        index=True,  # Added index
         comment="Type of event that occurred (e.g., user creation, payment, etc.)"
     )
     event_metadata = Column(
@@ -172,13 +186,16 @@ class GlobalEvent(Base, PartitionedModel):
         nullable=True,
         comment="Additional event-specific data stored as JSON"
     )
-    caller_entity_id = Column(UUID(as_uuid=True), 
-                              nullable=True, 
-                              comment="ID of the entity that triggered the event"
-                              )
+    caller_entity_id = Column(
+        UUID(as_uuid=True), 
+        nullable=True,
+        index=True,  # Added index
+        comment="ID of the entity that triggered the event"
+    )
     fake_user_id = Column(
         UUID(as_uuid=True), 
         nullable=True,
+        index=True,  # Added index
         comment="ID of the user associated with this event (if applicable)"
     )
     
@@ -198,15 +215,32 @@ class GlobalEvent(Base, PartitionedModel):
         comment="Key used for time-based table partitioning"
     )
 
+    # Indexes for common queries
     __table_args__ = (
+        # Composite index for event_type and event_time for filtering events by type within a time range
+        Index('ix_global_events_type_time', 'event_type', 'event_time'),
+        
+        # Composite index for user_id and event_time for user timeline queries
+        Index('ix_global_events_user_time', 'fake_user_id', 'event_time'),
+        
+        # Composite index for user_id and event_type for user-specific event type queries
+        Index('ix_global_events_user_type', 'fake_user_id', 'event_type'),
+        
+        # Composite index for caller_entity_id and event_time for entity timeline queries
+        Index('ix_global_events_entity_time', 'caller_entity_id', 'event_time'),
+        
+        # Foreign key constraint
         ForeignKeyConstraint(
             ['fake_user_id'], ['data_playground.fake_users.id'],
             name='fk_global_event_fake_user',
             comment="Foreign key relationship to the fake_users table"
         ),
+        
+        # Partitioning configuration
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
-            'schema': 'data_playground'
+            'schema': 'data_playground',
+            'comment': 'Stores all system events with hourly partitioning for efficient querying'
         }
     )
 

@@ -14,8 +14,8 @@ def generate_partition_name(tablename, partition_key):
 
 @declarative_mixin
 class PartitionedModel:
-    # Changed from primary_key=True to just a regular column
-    partition_key = Column(String, nullable=False)
+    # Include partition_key in primary key
+    partition_key = Column(String, nullable=False, primary_key=True)
 
     @declared_attr
     def __tablename__(cls):
@@ -43,8 +43,8 @@ class PartitionedModel:
                             SELECT FROM pg_tables
                             WHERE schemaname = 'data_playground' AND tablename = '{partition_name}'
                         ) THEN
-                            CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
-                            FOR VALUES IN ('{partition_key}');
+                            CREATE TABLE IF NOT EXISTS data_playground.{partition_name} PARTITION OF data_playground.{self.__tablename__}
+                            FOR VALUES FROM ('{partition_key}') TO ('{(event_time + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00:00")}');
                         ELSE
                             RAISE NOTICE 'Partition {partition_name} already exists';
                         END IF;
@@ -61,7 +61,7 @@ class PartitionedModel:
                             SELECT FROM pg_tables
                             WHERE schemaname = 'data_playground' AND tablename = '{partition_name}'
                         ) THEN
-                            CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
+                            CREATE TABLE IF NOT EXISTS data_playground.{partition_name} PARTITION OF data_playground.{self.__tablename__}
                             FOR VALUES FROM ('{partition_key}') TO ('{next_partition}');
                         ELSE
                             RAISE NOTICE 'Partition {partition_name} already exists';
