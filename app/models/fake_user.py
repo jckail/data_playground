@@ -181,6 +181,7 @@ class FakeUser(Base, PartitionedModel):
     __table_args__ = (
         # Unique constraints must include partition_key
         UniqueConstraint('username', 'partition_key', name='uq_fake_users_username'),
+        UniqueConstraint('id', 'partition_key', name='uq_fake_users_id'),
         
         # Composite index for status and created_time for filtering active users by creation date
         Index('ix_fake_users_status_created_time', 'status', 'created_time'),

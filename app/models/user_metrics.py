@@ -40,7 +40,8 @@ class FakeUserMetricsHourly(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_metrics_hourly_user'
         ),
         {
@@ -87,7 +88,8 @@ class FakeUserMetricsDaily(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_metrics_daily_user'
         ),
         {

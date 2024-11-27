@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, UUID, Index
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, UUID, Index, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -22,7 +22,7 @@ class FakeUserShop(Base, PartitionedModel):
     process orders, manage inventory, and handle customer interactions.
     
     Indexing Strategy:
-    - Primary key (id) is automatically indexed
+    - Primary key (id, partition_key) for partitioning support
     - shop_category is indexed for filtering shops by category
     - status is indexed for filtering active/inactive shops
     - fake_user_owner_id is indexed for owner-based queries
@@ -147,8 +147,8 @@ class FakeUserShop(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -211,6 +211,9 @@ class FakeUserShop(Base, PartitionedModel):
 
     # Indexes for common queries
     __table_args__ = (
+        # Unique constraint for id and partition_key
+        UniqueConstraint('id', 'partition_key', name='uq_fake_user_shops_id'),
+        
         # Composite index for status and category for filtering active shops by category
         Index('ix_fake_user_shops_status_category', 'status', 'shop_category'),
         
@@ -223,9 +226,10 @@ class FakeUserShop(Base, PartitionedModel):
         # Composite index for status and created_time for filtering active shops by creation date
         Index('ix_fake_user_shops_status_created', 'status', 'created_time'),
         
-        # Foreign key constraint
+        # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_owner_id'], ['data_playground.fake_users.id'],
+            ['fake_user_owner_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_shop_owner',
             comment="Foreign key relationship to the fake_users table"
         ),

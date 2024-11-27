@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, UUID
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, UUID, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -58,8 +58,7 @@ class FakeUserPaymentMethod(Base, PartitionedModel):
     # Tokenized/Masked Information
     token = Column(
         String(255), 
-        nullable=False, 
-        unique=True,
+        nullable=False,
         comment="Tokenized payment method (for security)"
     )
     last_four = Column(
@@ -169,17 +168,19 @@ class FakeUserPaymentMethod(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_payment_method_user',
             comment="Foreign key relationship to the fake_users table"
         ),
+        UniqueConstraint('token', 'partition_key', name='uq_fake_user_payment_methods_token'),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
             'schema': 'data_playground',
@@ -240,8 +241,7 @@ class FakeUserShopOrderPayment(Base, PartitionedModel):
     )
     transaction_reference = Column(
         String(100), 
-        nullable=True, 
-        unique=True,
+        nullable=True,
         comment="External transaction reference"
     )
     
@@ -275,27 +275,31 @@ class FakeUserShopOrderPayment(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['order_id'], ['data_playground.fake_user_shop_orders.id'],
+            ['order_id', 'partition_key'],
+            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
             name='fk_fake_user_shop_order_payment_order',
             comment="Foreign key relationship to the fake_user_shop_orders table"
         ),
         ForeignKeyConstraint(
-            ['payment_method_id'], ['data_playground.fake_user_payment_methods.id'],
+            ['payment_method_id', 'partition_key'],
+            ['data_playground.fake_user_payment_methods.id', 'data_playground.fake_user_payment_methods.partition_key'],
             name='fk_fake_user_shop_order_payment_method',
             comment="Foreign key relationship to the fake_user_payment_methods table"
         ),
         ForeignKeyConstraint(
-            ['payment_id'], ['data_playground.fake_user_payments.payment_id'],
+            ['payment_id', 'partition_key'],
+            ['data_playground.fake_user_payments.payment_id', 'data_playground.fake_user_payments.partition_key'],
             name='fk_fake_user_shop_order_payment_payment',
             comment="Foreign key relationship to the fake_user_payments table"
         ),
+        UniqueConstraint('transaction_reference', 'partition_key', name='uq_fake_user_shop_order_payments_transaction_reference'),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
             'schema': 'data_playground',

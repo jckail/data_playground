@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, Integer, UUID
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, Integer, UUID, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime, timedelta
@@ -43,8 +43,7 @@ class FakeUserInvoice(Base, PartitionedModel):
     )
     invoice_number = Column(
         String(50), 
-        nullable=False, 
-        unique=True,
+        nullable=False,
         comment="Human-readable invoice reference number"
     )
     fake_user_id = Column(
@@ -134,8 +133,8 @@ class FakeUserInvoice(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -149,13 +148,19 @@ class FakeUserInvoice(Base, PartitionedModel):
     )
 
     __table_args__ = (
+        # Unique constraint for invoice number must include partition key
+        UniqueConstraint('invoice_number', 'partition_key', name='uq_fake_user_invoices_number'),
+        
+        # Foreign key constraints must include partition key
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_invoice_user',
             comment="Foreign key relationship to the fake_users table"
         ),
         ForeignKeyConstraint(
-            ['shop_id'], ['data_playground.fake_user_shops.id'],
+            ['shop_id', 'partition_key'],
+            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
             name='fk_fake_user_invoice_shop',
             comment="Foreign key relationship to the fake_user_shops table"
         ),

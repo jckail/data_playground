@@ -147,7 +147,7 @@ class GlobalEvent(Base, PartitionedModel):
     and enabling system-wide monitoring and analysis.
     
     Indexing Strategy:
-    - Primary key (event_id) is automatically indexed
+    - Primary key (event_id, partition_key) for partitioning support
     - event_type is indexed for filtering specific types of events
     - fake_user_id is indexed for user-specific event queries
     - event_time is indexed for time-based queries and partitioning
@@ -210,8 +210,8 @@ class GlobalEvent(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -229,9 +229,10 @@ class GlobalEvent(Base, PartitionedModel):
         # Composite index for caller_entity_id and event_time for entity timeline queries
         Index('ix_global_events_entity_time', 'caller_entity_id', 'event_time'),
         
-        # Foreign key constraint
+        # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_global_event_fake_user',
             comment="Foreign key relationship to the fake_users table"
         ),

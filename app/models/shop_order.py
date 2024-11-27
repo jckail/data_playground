@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, UUID, Index
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, UUID, Index, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -31,7 +31,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
     and be part of promotions.
     
     Indexing Strategy:
-    - Primary key (id) is automatically indexed
+    - Primary key (id, partition_key) for partitioning support
     - order_number is indexed for quick order lookups
     - status is indexed for filtering orders by status
     - fake_user_id is indexed for customer-based queries
@@ -59,8 +59,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
     )
     order_number = Column(
         String(50), 
-        nullable=False, 
-        unique=True,
+        nullable=False,
         index=True,  # Added index
         comment="Human-readable order reference number"
     )
@@ -223,8 +222,8 @@ class FakeUserShopOrder(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -271,6 +270,9 @@ class FakeUserShopOrder(Base, PartitionedModel):
 
     # Indexes for common queries
     __table_args__ = (
+        # Unique constraint for order number must include partition key
+        UniqueConstraint('order_number', 'partition_key', name='uq_fake_user_shop_orders_number'),
+        
         # Composite index for shop and status for filtering orders by status within a shop
         Index('ix_fake_user_shop_orders_shop_status', 'fake_user_shop_id', 'status'),
         
@@ -286,14 +288,16 @@ class FakeUserShopOrder(Base, PartitionedModel):
         # Composite index for shipping-related queries
         Index('ix_fake_user_shop_orders_shipping', 'shipping_method', 'shipping_country', 'shipping_state'),
         
-        # Foreign key constraints
+        # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_shop_order_user',
             comment="Foreign key relationship to the fake_users table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_shop_id'], ['data_playground.fake_user_shops.id'],
+            ['fake_user_shop_id', 'partition_key'],
+            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
             name='fk_fake_user_shop_order_shop',
             comment="Foreign key relationship to the fake_user_shops table"
         ),
@@ -404,7 +408,7 @@ class FakeUserShopOrderItem(Base, PartitionedModel):
     pricing, and status information.
     
     Indexing Strategy:
-    - Primary key (id) is automatically indexed
+    - Primary key (id, partition_key) for partitioning support
     - order_id is indexed for order-based queries
     - product_id is indexed for product-based queries
     - event_time is indexed for partitioning
@@ -507,8 +511,8 @@ class FakeUserShopOrderItem(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -523,14 +527,16 @@ class FakeUserShopOrderItem(Base, PartitionedModel):
         # Composite index for cancelled/refunded items
         Index('ix_fake_user_shop_order_items_status', 'is_cancelled', 'is_refunded'),
         
-        # Foreign key constraints
+        # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['order_id'], ['data_playground.fake_user_shop_orders.id'],
+            ['order_id', 'partition_key'],
+            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
             name='fk_fake_user_shop_order_item_order',
             comment="Foreign key relationship to the fake_user_shop_orders table"
         ),
         ForeignKeyConstraint(
-            ['product_id'], ['data_playground.fake_user_shop_products.id'],
+            ['product_id', 'partition_key'],
+            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
             name='fk_fake_user_shop_order_item_product',
             comment="Foreign key relationship to the fake_user_shop_products table"
         ),
