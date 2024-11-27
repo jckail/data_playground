@@ -1,5 +1,16 @@
 version: "3.8"
 services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - fastapi
+      - streamlit
+      - prometheus
+
   db:
     image: postgres:15
     command:
@@ -46,8 +57,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.fastapi
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
@@ -78,8 +89,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.streamlit
-    ports:
-      - "8501:8501"
+    expose:
+      - "8501"
     depends_on:
       db:
         condition: service_healthy
@@ -105,35 +116,13 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
-    ports:
-      - 9090:9090
+      - "--web.external-url=/prometheus"
+      - "--web.route-prefix=/prometheus"
+    expose:
+      - "9090"
     restart: always
-
-  # disk_monitor:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.disk_monitor
-  #   volumes:
-  #     - /:/hostfs:ro
-  #   privileged: true
 
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
-
-  # grafana:
-  #   image: grafana/grafana:8.2.2
-  #   ports:
-  #     - 3000:3000
-  #   volumes:
-  #     - grafana_data:/var/lib/grafana
-  #     - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-  #     - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources  # <-- Verify this line
-  #     - ./grafana/dashboards:/var/lib/grafana/dashboards
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin_password
-  #     - GF_LOG_LEVEL=debug
-  #   depends_on:
-  #     - prometheus
-  #   restart: always
