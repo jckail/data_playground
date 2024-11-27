@@ -4,6 +4,9 @@ FROM python:3.12
 
 WORKDIR /code
 
+# Install PostgreSQL client tools
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
 # Copy the requirements file and install dependencies
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
@@ -11,7 +14,7 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 # Copy the application code
 COPY ./app /code/app
 
-# Copy the wait_for_db script
+# Copy the wait_for_db script and run_query script
 COPY ./wait_for_db.py /code/wait_for_db.py
 COPY ./run_query.py /code/run_query.py
 

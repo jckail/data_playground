@@ -167,8 +167,13 @@ async def fetch_and_insert_shop_data(db: AsyncSession, partition_key: date, prev
         FROM base2
         """
 
-        await db.execute(text(query))
+        result = await db.execute(text(query))
+        logger.info(f"Data insert operation successful, preparing to commit the transaction.")
+
+        # Commit the transaction
         await db.commit()
+        logger.info("Transaction committed successfully.")
+
         
         logger.info("Shop data inserted successfully")
 

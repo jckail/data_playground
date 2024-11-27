@@ -8,7 +8,7 @@ from .tasks.fake_data_generator import run_async_generate_fake_data
 import logging
 import sys
 import os
-from .database import get_db, parse_event_time, create_db_engine
+from .database import get_db, parse_event_time, engine
 from datetime import datetime
 from .models import RequestResponseLog
 import pytz
@@ -108,13 +108,13 @@ async def startup_event():
         logging.warning("Disk usage is above 80%")
     
     # Check database connection
-    try:
-        await create_db_engine()
-        logging.info("Successfully connected to the database")
-    except Exception as e:
-        logging.error(f"Failed to connect to database: {str(e)}")
+    # try:
+    #     await engine
+    #     logging.info("Successfully connected to the database")
+    # except Exception as e:
+    #     logging.error(f"Failed to connect to database: {str(e)}")
 
-    # Start the scheduler in a separate thread
+    # # Start the scheduler in a separate thread
     threading.Thread(target=run_scheduler, daemon=True).start()
 
 @app.on_event("shutdown")

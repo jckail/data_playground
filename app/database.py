@@ -1,80 +1,57 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import OperationalError, InterfaceError
-from sqlalchemy import text
 import os
+import logging
+from sqlalchemy.exc import InterfaceError
+from sqlalchemy import text
 from datetime import datetime
 import pytz
 from dateutil.parser import parse
 from fastapi import HTTPException
-import logging
+
 import asyncio
 
-logger = logging.getLogger("request_response_logger")
+logger = logging.getLogger("streamlit_app")
 logging.basicConfig(level=logging.INFO)
 
-# Get the database URL from environment variables, with a default value for development
+
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql+asyncpg://user:password@db/dbname"
 )
+# Get connection pool settings from environment variables
+POOL_SIZE = int(os.getenv("POOL_SIZE", 20))
+MAX_OVERFLOW = int(os.getenv("MAX_OVERFLOW", 10))
+POOL_TIMEOUT = int(os.getenv("POOL_TIMEOUT", 30))
+POOL_RECYCLE = int(os.getenv("POOL_RECYCLE", 1800))
 
-# Engine and sessionmaker instances
-engine = None
-AsyncSessionLocal = None
+# Create the engine
+engine = create_async_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_size=POOL_SIZE,
+    max_overflow=MAX_OVERFLOW,
+    pool_timeout=POOL_TIMEOUT,
+    pool_recycle=POOL_RECYCLE,
+    pool_pre_ping=True,
+)
 
-async def create_db_engine(max_retries=5, initial_wait=1):
-    """Create and return the database engine with retry logic on connection failure."""
-    retries = 0
-    wait = initial_wait
-    while retries < max_retries:
-        try:
-            engine = create_async_engine(
-                SQLALCHEMY_DATABASE_URL,
-                pool_size=20,
-                max_overflow=10,
-                pool_timeout=30,
-                pool_recycle=1800,
-            )
-            # Test the connection
-            async with engine.begin() as conn:
-                await conn.execute(text("SELECT 1"))
-            logger.info("Database connection established.")
-            return engine
-        except OperationalError as e:
-            if retries == max_retries - 1:
-                logger.error(f"Failed to connect to the database after {max_retries} attempts.")
-                raise
-            else:
-                logger.warning(f"Database connection attempt {retries + 1} failed. Retrying in {wait} seconds...")
-                await asyncio.sleep(wait)
-                retries += 1
-                wait *= 2
-
-async def get_engine():
-    """Return the database engine, creating it if necessary."""
-    global engine
-    if engine is None:
-        engine = await create_db_engine()
-    return engine
-
-async def get_async_session_local():
-    """Return the sessionmaker for creating new sessions."""
-    global AsyncSessionLocal
-    if AsyncSessionLocal is None:
-        engine = await get_engine()
-        AsyncSessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=True,
-            bind=engine,
-            class_=AsyncSession
-        )
-    return AsyncSessionLocal
+# Create sessionmaker
+AsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
 
 async def get_db():
-    """Dependency that provides a database session to FastAPI endpoints."""
-    AsyncSessionLocal = await get_async_session_local()
+    """Coroutine that provides a database session."""
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            await session.close()
+
+logger.info("Database connection setup completed.")
 
 semaphore = asyncio.Semaphore(25)
 
@@ -83,7 +60,6 @@ async def execute_query(query: str, retries=3):
     for attempt in range(retries):
         try:
             async with semaphore:
-                AsyncSessionLocal = await get_async_session_local()
                 async with AsyncSessionLocal() as session:
                     async with session.begin():  # Start a transaction
                         result = await session.execute(text(query))

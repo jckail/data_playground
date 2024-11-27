@@ -5,3 +5,5 @@
 offlinenotes.txt
 /app/templates/*
 !/app/templates/index.html
+summaries
+final_summary.txt

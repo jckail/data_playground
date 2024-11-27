@@ -4,7 +4,11 @@ from asyncio import run_coroutine_threadsafe
 import streamlit as st
 import os
 import plotly.io as pio
-from plots import create_users_shops_plot, create_events_plot, create_status_code_plot
+from plots import create_users_shops_plot, create_events_plot, create_status_code_plot, create_sankey_diagram
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Utility to create and manage the event loop in a separate thread
 @st.cache_resource(show_spinner=False)
@@ -27,63 +31,58 @@ async def main():
     users_shops_task = create_users_shops_plot()
     events_task = create_events_plot()
     status_code_task = create_status_code_plot()
+    sankey_task = create_sankey_diagram()
     
-    users_shops_result, events_result, status_code_result = await asyncio.gather(
-        users_shops_task, events_task, status_code_task
+    results = await asyncio.gather(
+        users_shops_task, events_task, status_code_task, sankey_task,
+        return_exceptions=True
     )
     
-    return users_shops_result, events_result, status_code_result
+    return results
 
 def app_logic():
-    # Fetch data every time the page is refreshed
-    users_shops_result, events_result, status_code_result = run_async(main())
+    try:
+        # Fetch data every time the page is refreshed
+        results = run_async(main())
 
-    # Unpack the results
-    users_shops_fig, users_data, shops_data = users_shops_result
-    events_fig, events_data = events_result
-    status_code_fig, status_code_data = status_code_result
+        # Streamlit app
+        st.title('Users, Shops, Event, and Status Code Data Visualization')
 
-    # Generate static HTML for each plot
-    users_shops_html = pio.to_html(users_shops_fig, full_html=False)
-    events_html = pio.to_html(events_fig, full_html=False)
-    status_code_html = pio.to_html(status_code_fig, full_html=False)
+        plot_functions = [
+            ('Users and Shops Count Over Time', create_users_shops_plot),
+            ('Event Counts Over Time', create_events_plot),
+            ('Status Code Counts Per Minute (Last Hour)', create_status_code_plot),
+            ('User and Shop Activity Flow (Last 30 Days)', create_sankey_diagram)
+        ]
 
-    # Ensure the 'templates' directory exists
-    os.makedirs('templates', exist_ok=True)
+        for i, (title, _) in enumerate(plot_functions):
+            result = results[i]
+            if isinstance(result, Exception):
+                st.error(f"Error occurred while creating {title}: {str(result)}")
+            else:
+                st.subheader(title)
+                if i == 0:  # Users and Shops plot
+                    fig, users_data, shops_data = result
+                    if users_data and shops_data:
+                        st.plotly_chart(fig)
+                        st.write('Users Data:')
+                        st.write(users_data)
+                        st.write('Shops Data:')
+                        st.write(shops_data)
+                    else:
+                        st.warning(f"No data available for {title}")
+                else:
+                    fig, data = result
+                    if data:
+                        st.plotly_chart(fig)
+                        st.write(f'Raw data for {title}:')
+                        st.write(data)
+                    else:
+                        st.warning(f"No data available for {title}")
 
-    # Save the plot HTML to files
-    with open('templates/users_shops_plot.html', 'w') as f:
-        f.write(users_shops_html)
-    with open('templates/events_plot.html', 'w') as f:
-        f.write(events_html)
-    with open('templates/status_code_plot.html', 'w') as f:
-        f.write(status_code_html)
-
-    # Streamlit app
-    st.title('Users, Shops, Event, and Status Code Data Visualization')
-
-    # Display the users and shops plot
-    st.subheader('Users and Shops Count Over Time')
-    st.plotly_chart(users_shops_fig)
-
-    # Display the events plot
-    st.subheader('Event Counts Over Time')
-    st.plotly_chart(events_fig)
-
-    # Display the status code plot
-    st.subheader('Status Code Counts Over Time')
-    st.plotly_chart(status_code_fig)
-
-    # Display raw data
-    st.subheader('Raw Data')
-    st.write('Users Data:')
-    st.write(users_data)
-    st.write('Shops Data:')
-    st.write(shops_data)
-    st.write('Events Data:')
-    st.write(events_data)
-    st.write('Status Code Data:')
-    st.write(status_code_data)
+    except Exception as e:
+        logger.error(f"An error occurred in the Streamlit app: {e}")
+        st.error("An error occurred while generating the visualizations. Please try again later.")
 
 if __name__ == "__main__":
     app_logic()

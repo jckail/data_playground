@@ -4,6 +4,9 @@ FROM python:3.12
 
 WORKDIR /code
 
+# Install PostgreSQL client tools (for consistency with FastAPI container)
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
 # Copy the requirements file and install dependencies
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
