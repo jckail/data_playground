@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, Integer, UUID, Index
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, Integer, UUID, Index, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -32,7 +32,7 @@ class FakeUserShopProduct(Base, PartitionedModel):
     reviewed, and tracked in inventory. They also maintain their own metrics.
     
     Indexing Strategy:
-    - Primary key (id) is automatically indexed
+    - Primary key (id, partition_key) for partitioning support
     - sku is indexed for quick product lookups
     - category is indexed for category-based filtering
     - status is indexed for filtering active/inactive products
@@ -69,7 +69,6 @@ class FakeUserShopProduct(Base, PartitionedModel):
     sku = Column(
         String(50), 
         nullable=False,
-        index=True,  # Added index
         comment="Stock Keeping Unit - unique product identifier within the shop"
     )
     name = Column(
@@ -193,8 +192,8 @@ class FakeUserShopProduct(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -241,6 +240,9 @@ class FakeUserShopProduct(Base, PartitionedModel):
 
     # Indexes for common queries
     __table_args__ = (
+        # Unique constraint for SKU must include partition key
+        UniqueConstraint('sku', 'partition_key', name='uq_fake_user_shop_products_sku'),
+        
         # Composite index for shop and status for filtering active products by shop
         Index('ix_fake_user_shop_products_shop_status', 'fake_user_shop_id', 'status'),
         
@@ -256,9 +258,10 @@ class FakeUserShopProduct(Base, PartitionedModel):
         # Composite index for product search by name within a shop
         Index('ix_fake_user_shop_products_shop_name', 'fake_user_shop_id', 'name'),
         
-        # Foreign key constraint
+        # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_shop_id'], ['data_playground.fake_user_shops.id'],
+            ['fake_user_shop_id', 'partition_key'],
+            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
             name='fk_fake_user_shop_product_shop',
             comment="Foreign key relationship to the fake_user_shops table"
         ),

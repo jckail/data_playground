@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, Float, Integer, ForeignKeyConstraint, UUID, JSON
+from sqlalchemy import Column, DateTime, Float, Integer, ForeignKeyConstraint, UUID, JSON, String
 from datetime import datetime
 
 class FakeUserShopProductMetricsHourly(Base, PartitionedModel):
@@ -43,9 +43,18 @@ class FakeUserShopProductMetricsHourly(Base, PartitionedModel):
     page_views = Column(Integer, nullable=False, default=0)
     extra_metrics = Column(JSON, nullable=True, default={})
 
+    # Partition key for time-based partitioning
+    partition_key = Column(
+        String, 
+        nullable=False,
+        primary_key=True,
+        comment="Key used for time-based table partitioning"
+    )
+
     __table_args__ = (
         ForeignKeyConstraint(
-            ['product_id'], ['data_playground.fake_user_shop_products.id'],
+            ['product_id', 'partition_key'],
+            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
             name='fk_fake_user_shop_product_metrics_hourly_product'
         ),
         {
@@ -95,9 +104,18 @@ class FakeUserShopProductMetricsDaily(Base, PartitionedModel):
     page_views = Column(Integer, nullable=False, default=0)
     extra_metrics = Column(JSON, nullable=True, default={})
 
+    # Partition key for time-based partitioning
+    partition_key = Column(
+        String, 
+        nullable=False,
+        primary_key=True,
+        comment="Key used for time-based table partitioning"
+    )
+
     __table_args__ = (
         ForeignKeyConstraint(
-            ['product_id'], ['data_playground.fake_user_shop_products.id'],
+            ['product_id', 'partition_key'],
+            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
             name='fk_fake_user_shop_product_metrics_daily_product'
         ),
         {

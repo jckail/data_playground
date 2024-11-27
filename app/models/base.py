@@ -21,6 +21,14 @@ class PartitionedModel:
     def __tablename__(cls):
         return cls.__name__.lower()
 
+    @declared_attr
+    def __table_args__(cls):
+        # Default table args for partitioned tables
+        return {
+            'postgresql_partition_by': 'RANGE (partition_key)',
+            'schema': 'data_playground'
+        }
+
     async def generate_partition_key(self, db):
         event_time = getattr(self, self.__partition_field__, None)
         if not isinstance(event_time, datetime):

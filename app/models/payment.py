@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, UUID
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enum, Float, UUID, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -71,8 +71,7 @@ class FakeUserPayment(Base, PartitionedModel):
     # Transaction Details
     transaction_reference = Column(
         String(100), 
-        nullable=True, 
-        unique=True,
+        nullable=True,
         comment="External transaction reference"
     )
     transaction_fee = Column(
@@ -117,8 +116,8 @@ class FakeUserPayment(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -139,11 +138,18 @@ class FakeUserPayment(Base, PartitionedModel):
     )
 
     __table_args__ = (
+        # Unique constraint for transaction reference must include partition key
+        UniqueConstraint('transaction_reference', 'partition_key', name='uq_fake_user_payments_transaction_ref'),
+        
+        # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_invoice_id'], ['data_playground.fake_user_invoices.invoice_id'],
+            ['fake_user_invoice_id', 'partition_key'],
+            ['data_playground.fake_user_invoices.invoice_id', 'data_playground.fake_user_invoices.partition_key'],
             name='fk_fake_user_payment_invoice',
             comment="Foreign key relationship to the fake_user_invoices table"
         ),
+        
+        # Partitioning configuration
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
             'schema': 'data_playground',

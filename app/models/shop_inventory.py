@@ -42,7 +42,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     - Older partitions can be archived or dropped based on retention policy
     """
     __tablename__ = 'fake_user_shop_inventory_logs'
-    __partitiontype__ = "hourly"  # Changed from daily to hourly
+    __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -55,19 +55,19 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     fake_user_shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the shop where the inventory change occurred"
     )
     product_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the product whose inventory changed"
     )
     order_id = Column(
         UUID(as_uuid=True), 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="ID of the related order (if applicable)"
     )
     
@@ -164,8 +164,8 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -186,24 +186,28 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
         # Composite index for stock level tracking
         Index('ix_fake_user_shop_inventory_levels', 'product_id', 'quantity_after', 'created_time'),
         
-        # Foreign key constraints
+        # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['fake_user_shop_id'], ['data_playground.fake_user_shops.id'],
+            ['fake_user_shop_id', 'partition_key'],
+            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
             name='fk_fake_user_shop_inventory_log_shop',
             comment="Foreign key relationship to the fake_user_shops table"
         ),
         ForeignKeyConstraint(
-            ['product_id'], ['data_playground.fake_user_shop_products.id'],
+            ['product_id', 'partition_key'],
+            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
             name='fk_fake_user_shop_inventory_log_product',
             comment="Foreign key relationship to the fake_user_shop_products table"
         ),
         ForeignKeyConstraint(
-            ['order_id'], ['data_playground.fake_user_shop_orders.id'],
+            ['order_id', 'partition_key'],
+            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
             name='fk_fake_user_shop_inventory_log_order',
             comment="Foreign key relationship to the fake_user_shop_orders table"
         ),
         ForeignKeyConstraint(
-            ['created_by_user_id'], ['data_playground.fake_users.id'],
+            ['created_by_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_shop_inventory_log_user',
             comment="Foreign key relationship to the fake_users table"
         ),

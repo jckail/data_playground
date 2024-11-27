@@ -1,5 +1,5 @@
 from .base import Base, PartitionedModel
-from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, Integer, UUID, ARRAY, Index
+from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, JSON, Enum, Float, Integer, UUID, ARRAY, Index, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
@@ -53,7 +53,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     - Older partitions can be archived or dropped based on retention policy
     """
     __tablename__ = 'fake_user_shop_promotions'
-    __partitiontype__ = "hourly"  # Changed from daily to hourly
+    __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -66,7 +66,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     fake_user_shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the shop offering the promotion"
     )
     
@@ -172,9 +172,8 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     # Promotion Codes
     promo_code = Column(
         String(50), 
-        nullable=True, 
-        unique=True,
-        index=True,  # Added index
+        nullable=True,
+        index=True,  # Changed from unique=True to just index=True
         comment="Code users enter to apply promotion"
     )
     requires_code = Column(
@@ -224,22 +223,16 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
-    )
-
-    # Relationships
-    # Records of promotion usage
-    usages = relationship(
-        "FakeUserShopPromotionUsage",
-        backref=backref("promotion", lazy="joined"),
-        foreign_keys="FakeUserShopPromotionUsage.promotion_id",
-        lazy="dynamic"
     )
 
     # Indexes for common queries
     __table_args__ = (
+        # Unique constraint for promo code must include partition key
+        UniqueConstraint('promo_code', 'partition_key', name='uq_fake_user_shop_promotions_code'),
+        
         # Composite index for active promotions by shop
         Index('ix_fake_user_shop_promotions_shop_status', 'fake_user_shop_id', 'status'),
         
@@ -255,9 +248,10 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         # Composite index for usage tracking
         Index('ix_fake_user_shop_promotions_usage', 'current_usage_count', 'usage_limit_total'),
         
-        # Foreign key constraint
+        # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_shop_id'], ['data_playground.fake_user_shops.id'],
+            ['fake_user_shop_id', 'partition_key'],
+            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
             name='fk_fake_user_shop_promotion_shop',
             comment="Foreign key relationship to the fake_user_shops table"
         ),
@@ -358,7 +352,7 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
     - Composite indexes for common query patterns
     """
     __tablename__ = 'fake_user_shop_promotion_usages'
-    __partitiontype__ = "hourly"  # Changed from daily to hourly
+    __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -371,19 +365,19 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
     promotion_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the promotion used"
     )
     fake_user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the user who used the promotion"
     )
     order_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the order where promotion was applied"
     )
     
@@ -428,8 +422,8 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
     # Partition key for time-based partitioning
     partition_key = Column(
         String, 
-        nullable=False, 
-        index=True,
+        nullable=False,
+        primary_key=True,
         comment="Key used for time-based table partitioning"
     )
 
@@ -444,19 +438,22 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
         # Composite index for promotion usage over time
         Index('ix_fake_user_shop_promotion_usages_time', 'promotion_id', 'created_time'),
         
-        # Foreign key constraints
+        # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['promotion_id'], ['data_playground.fake_user_shop_promotions.id'],
+            ['promotion_id', 'partition_key'],
+            ['data_playground.fake_user_shop_promotions.id', 'data_playground.fake_user_shop_promotions.partition_key'],
             name='fk_fake_user_shop_promotion_usage_promotion',
             comment="Foreign key relationship to the fake_user_shop_promotions table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_id'], ['data_playground.fake_users.id'],
+            ['fake_user_id', 'partition_key'],
+            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
             name='fk_fake_user_shop_promotion_usage_user',
             comment="Foreign key relationship to the fake_users table"
         ),
         ForeignKeyConstraint(
-            ['order_id'], ['data_playground.fake_user_shop_orders.id'],
+            ['order_id', 'partition_key'],
+            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
             name='fk_fake_user_shop_promotion_usage_order',
             comment="Foreign key relationship to the fake_user_shop_orders table"
         ),
