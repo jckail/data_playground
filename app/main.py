@@ -1,6 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, Request, Response, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from .routes import create_rollups, users, events, shops, invoices, payments, user_snapshot, shop_snapshot, generate_fake_data
 from app.core.scheduler import run_scheduler
 import threading
@@ -22,6 +23,9 @@ import re
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = FastAPI()
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

@@ -37,6 +37,12 @@
                 background-color: #ddd;
                 color: black;
             }
+            .navbar img {
+                float: left;
+                height: 30px;
+                padding: 8px 16px;
+                filter: invert(100%);
+            }
             .content {
                 margin-top: 60px;
                 padding: 20px;
@@ -50,8 +56,10 @@
     </head>
     <body>
         <div class="navbar">
+            <img src="/static/playground-icon.svg" alt="Playground Logo">
             <a href="http://0.0.0.0:8000/docs" target="_blank">Go to Docs</a>
-            <a href="http://0.0.0.0:8501" target="_blank">Go to Streamlit Dashboard</a>
+            <a href="http://0.0.0.0:8000/streamlit" target="_blank">Go to Streamlit Dashboard</a>
+            <a href="http://0.0.0.0:8000/prometheus" target="_blank">Go to Prometheus Dashboard</a>
             <button onclick="triggerFakeData()">Generate Fake Data</button>
             <button onclick="triggerFakeRollups()">Trigger Rollups</button>
         </div>
