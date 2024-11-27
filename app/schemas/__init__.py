@@ -1,16 +1,16 @@
-from .user import UserCreate, UserDeactivate, UserResponse, UserSnapshot, UserSnapshotResponse
-from .shop import ShopCreate, ShopResponse, ShopDelete, ShopSnapshot , ShopSnapshotResponse
-from .invoice import InvoiceCreate, UserInvoice
+from .fake_user import FakeUserCreate, FakeUserDeactivate, FakeUserResponse, FakeUserSnapshot, FakeUserSnapshotResponse
+from .shop import ShopCreate, ShopResponse, ShopDelete, ShopSnapshot, ShopSnapshotResponse
+from .invoice import FakeUserInvoiceCreate, FakeUserInvoice
 from .payment import PaymentCreate, Payment
 from .global_event import GlobalEventCreate, GlobalEventResponse
 from .fake_data import FakeDataQuery
 
 # Export all schemas
 __all__ = [
-    "UserCreate", "UserDeactivate", "UserResponse", "UserSnapshot",
+    "FakeUserCreate", "FakeUserDeactivate", "FakeUserResponse", "FakeUserSnapshot",
     "ShopCreate", "ShopResponse", "ShopDelete", "ShopSnapshot", "ShopSnapshotResponse",
-    "InvoiceCreate", "UserInvoice",
+    "FakeUserInvoiceCreate", "FakeUserInvoice",
     "PaymentCreate", "Payment",
-    "GlobalEventCreate", "GlobalEventResponse", "UserSnapshotResponse",
+    "GlobalEventCreate", "GlobalEventResponse", "FakeUserSnapshotResponse",
     "FakeDataQuery"
 ]

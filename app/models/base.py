@@ -4,7 +4,6 @@ from sqlalchemy import Column, String, text
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import declarative_mixin
-#from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.exc import SQLAlchemyError
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -15,7 +14,8 @@ def generate_partition_name(tablename, partition_key):
 
 @declarative_mixin
 class PartitionedModel:
-    partition_key = Column(String, primary_key=True, nullable=False)
+    # Changed from primary_key=True to just a regular column
+    partition_key = Column(String, nullable=False)
 
     @declared_attr
     def __tablename__(cls):
@@ -41,7 +41,7 @@ class PartitionedModel:
                     BEGIN
                         IF NOT EXISTS (
                             SELECT FROM pg_tables
-                            WHERE schemaname = 'public' AND tablename = '{partition_name}'
+                            WHERE schemaname = 'data_playground' AND tablename = '{partition_name}'
                         ) THEN
                             CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
                             FOR VALUES IN ('{partition_key}');
@@ -59,7 +59,7 @@ class PartitionedModel:
                     BEGIN
                         IF NOT EXISTS (
                             SELECT FROM pg_tables
-                            WHERE schemaname = 'public' AND tablename = '{partition_name}'
+                            WHERE schemaname = 'data_playground' AND tablename = '{partition_name}'
                         ) THEN
                             CREATE TABLE IF NOT EXISTS {partition_name} PARTITION OF {self.__tablename__}
                             FOR VALUES FROM ('{partition_key}') TO ('{next_partition}');
@@ -76,7 +76,6 @@ class PartitionedModel:
         except SQLAlchemyError as e:
             await db.rollback()
             print(f"Error while creating partition for {self.__tablename__}: {str(e)}")
-            # Optionally, you can still raise an HTTPException here if needed
 
         return partition_key
 

@@ -1,19 +1,17 @@
-import asyncio
 import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool, MetaData
 
 from alembic import context
 
 # Add the parent directory of 'app' to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-# Import your models
-from app.models import Base
+# Import all models explicitly
+from app.models import *
 from app.database import SQLALCHEMY_DATABASE_URL
 
 # this is the Alembic Config object, which provides
@@ -28,30 +26,64 @@ if config.config_file_name is not None:
 # Set the database URL in the Alembic configuration
 config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# Create a metadata object specifically for our tables
+def combine_metadata(*args):
+    m = MetaData()
+    for metadata in args:
+        for t in metadata.tables.values():
+            t.tometadata(m)
+    return m
+
+# Combine all model metadata
 target_metadata = Base.metadata
 
-def exclude_partitions(autogen_context, tablename):
-    def include_object(object, name, type_, reflected, compare_to):
-        if type_ == "table" and name.startswith(f"{tablename}_p_"):
-            return False
-        return True
-    return include_object
-
-class PartitionedTableComparator:
-    def __init__(self, autogen_context, partition_tables):
-        self.autogen_context = autogen_context
-        self.partition_tables = partition_tables
-
-    def render_item(self, type_, obj, autogen_context):
-        if type_ == "table" and obj.name in self.partition_tables:
-            return None
-        return False
+# List of tables that belong to our application with their schemas
+OUR_TABLES = {
+    'data_playground.global_entities',  # Added new global entities table
+    'data_playground.global_events',
+    'data_playground.odds_maker',
+    'data_playground.fake_user_payments',
+    'data_playground.request_response_logs',
+    'data_playground.fake_user_shops',
+    'data_playground.fake_user_invoices',
+    'data_playground.fake_users',
+    'data_playground.fake_user_shop_products',
+    'data_playground.fake_user_shop_orders',
+    'data_playground.fake_user_shop_order_items',
+    'data_playground.fake_user_shop_reviews',
+    'data_playground.fake_user_shop_review_votes',
+    'data_playground.fake_user_shop_inventory_logs',
+    'data_playground.fake_user_shop_promotions',
+    'data_playground.fake_user_shop_promotion_usages',
+    'data_playground.fake_user_payment_methods',
+    'data_playground.fake_user_shop_order_payments',
+    # Metric tables
+    'data_playground.fake_user_metrics_hourly',
+    'data_playground.fake_user_metrics_daily',
+    'data_playground.fake_user_shop_metrics_hourly',
+    'data_playground.fake_user_shop_metrics_daily',
+    'data_playground.fake_user_shop_product_metrics_hourly',
+    'data_playground.fake_user_shop_product_metrics_daily'
+}
 
 def include_object(object, name, type_, reflected, compare_to):
+    # Always include enums
+    if type_ == "type":
+        return True
+        
     if type_ == "table":
-        return not (name.startswith("global_events_p_") or name.startswith("shops_p_") or name.startswith("users_p_") or "_p_" in name)
+        # Get schema and table name
+        schema = object.schema if hasattr(object, 'schema') else 'data_playground'
+        full_name = f"{schema}.{name}"
+        return full_name in OUR_TABLES
+    
+    if type_ == "index":
+        # Only include indexes if they're on our tables
+        if hasattr(object, 'table'):
+            schema = object.table.schema if hasattr(object.table, 'schema') else 'data_playground'
+            table_full_name = f"{schema}.{object.table.name}"
+            return table_full_name in OUR_TABLES
+    
     return True
 
 def run_migrations_offline() -> None:
@@ -63,38 +95,47 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_object=include_object,
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
-
-def do_run_migrations(connection: Connection) -> None:
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        include_object=include_object,
         compare_type=True,
         compare_server_default=True,
         include_schemas=True,
-        render_item=PartitionedTableComparator(context, ["global_events", "shops"]).render_item,
+        version_table_schema='data_playground',
     )
 
     with context.begin_transaction():
         context.run_migrations()
 
-async def run_migrations_online() -> None:
+def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     try:
-        connectable = async_engine_from_config(
-            config.get_section(config.config_ini_section),
+        # Get alembic section config
+        configuration = config.get_section(config.config_ini_section)
+        
+        # Add SSL mode
+        configuration["sqlalchemy.connect_args"] = {
+            'sslmode': 'require',
+            'connect_timeout': 10
+        }
+
+        connectable = engine_from_config(
+            configuration,
             prefix="sqlalchemy.",
             poolclass=pool.NullPool,
         )
 
-        async with connectable.connect() as connection:
-            await connection.run_sync(do_run_migrations)
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                include_object=include_object,
+                compare_type=True,
+                compare_server_default=True,
+                include_schemas=True,
+                version_table_schema='data_playground',  # Put alembic_version table in data_playground schema
+            )
 
-        await connectable.dispose()
+            with context.begin_transaction():
+                context.run_migrations()
+
     except Exception as e:
         print(f"Error during migration: {e}")
         raise
@@ -102,4 +143,4 @@ async def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

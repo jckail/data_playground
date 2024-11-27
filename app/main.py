@@ -2,7 +2,7 @@ from fastapi import FastAPI, BackgroundTasks, Request, Response, Depends, HTTPEx
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from .routes import create_rollups, users, events, shops, invoices, payments, user_snapshot, shop_snapshot, generate_fake_data
+from .routes import create_rollups, fake_users, events, shops, invoices, payments, fake_user_snapshot, shop_snapshot, generate_fake_data
 from app.core.scheduler import run_scheduler
 import threading
 from .tasks.fake_data_generator import run_async_generate_fake_data
@@ -35,13 +35,13 @@ logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="app/templates")
 
 # Include routers
-app.include_router(users.router)
+app.include_router(fake_users.router)  # Updated from users to fake_users
 app.include_router(invoices.router)
 app.include_router(payments.router)
 app.include_router(shops.router)
 app.include_router(events.router)
 app.include_router(create_rollups.router)
-app.include_router(user_snapshot.router)
+app.include_router(fake_user_snapshot.router)  # Updated from user_snapshot to fake_user_snapshot
 app.include_router(shop_snapshot.router)
 app.include_router(generate_fake_data.router)
 
