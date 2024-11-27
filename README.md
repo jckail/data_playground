@@ -1,115 +1,137 @@
-This is a work sample of end to end knowledge of data modeling via a simple hypothetical workflow:
+# Data Analytics Platform
 
-Objective model data in a way that is self servicable and build a dashboard to display given user events:
+A comprehensive data analytics and visualization platform demonstrating end-to-end data modeling, real-time analytics, and interactive dashboards. This project showcases full-stack development capabilities, data engineering practices, and modern DevOps approaches.
 
-1. lead -- where a user signs up for the shop app
-2. prospect -- where the user selects a plan avalible and creates a shop
-3. customer -- where the user has paid for the given shop 
-4. churn -- where the user does not pay or does not have any actions on their shop
+## 🎯 Overview
 
+This platform models and analyzes user journey data through various stages:
+- Lead → User signs up for the application
+- Prospect → User selects a plan and creates a shop
+- Customer → User completes first payment
+- Churn → User becomes inactive (non-payment or shop deletion)
 
-The data should be avalible at any point in time. 
-Sanky diagram would be helpful.
+## 🏗 Architecture
 
-User Signs Up for App 
-    --> Creates a shop 
-        --> Pays Invoice 
-            --> Repeat
-        --> Deletes Shop
-        --> Does Not pay Invoice 
+### Backend Services
+- **FastAPI Application**: RESTful API service with comprehensive data models and endpoints
+- **PostgreSQL Database**: Scalable data storage with partitioned tables
+- **Alembic**: Database migration management
+- **Background Tasks**: Automated data processing and rollup generation
 
-Event Map: 
+### Frontend & Visualization
+- **Streamlit Dashboard**: Interactive data visualization and analysis
+- **Grafana**: Real-time monitoring and custom dashboards
+- **Prometheus**: Metrics collection and monitoring
 
-user_creation --> lead
-shop_creation --> prospect
-customer --> first time bill paid
-churn --> deactivation, lack of payment, or shop deletion
+### Data Pipeline
+- **Event Processing**: Real-time event capture and processing
+- **Data Modeling**: Structured data storage with temporal partitioning
+- **Analytics Generation**: Automated rollup and analytics calculation
 
+## 📊 Data Models
 
-Tables: 
-----------------------------------------------------------------
+### Global Events
+```sql
+CREATE TABLE global_events (
+    ts VARCHAR,           -- Hourly partition timestamp
+    event_id UUID,        -- Unique event identifier
+    event_time TIMESTAMP, -- Actual event timestamp
+    event_type ENUM,      -- Event classification
+    metadata JSONB,       -- Event-specific data
+    PRIMARY KEY (ts, event_id)
+);
+```
 
-global_events (hourly)
+### Core Tables
+- **Users**: User account information and metadata
+- **Shops**: Store configurations and relationships
+- **Plans**: Service tier definitions
+- **Invoices**: Billing records
+- **Payments**: Transaction tracking
 
-ts : timestamp as a string of the hourly partition (partition key)
-pk event_id : UUID a unique id for the event 
-event_time: timestamp -- actual time of the event
-event_type : enum -- an enumerated value describing the event 
-metadata : json 
+## 🚀 Getting Started
 
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Start services:
+   ```bash
+   docker-compose up -d
+   ```
+4. Initialize database:
+   ```bash
+   alembic upgrade head
+   ```
+5. Run the application:
+   ```bash
+   ./helpers/local_test.sh
+   ```
 
+## 🔍 Key Features
 
+- **Real-time Analytics**: Live tracking of user activities and business metrics
+- **Interactive Dashboards**: Visual representation of data flows and user journeys
+- **Sankey Diagrams**: User flow visualization and conversion tracking
+- **Temporal Analysis**: Historical data analysis with point-in-time accuracy
+- **Automated Reporting**: Scheduled report generation and data rollups
 
-Event Types Meta Data Structure: 
-user_account_creation: 
-{
-    "user_id": varchar of the id of the user
-    "email" :
-}
+## 🛠 Development
 
-user_delete_account:
-{
-    "user_id": varchar of the id of the user
-}
+### API Endpoints
+- Frontend: `http://localhost:5173/`
+- Backend: `http://localhost:8080/`
+- Grafana: `http://localhost:3000/`
 
-user_shop_create: 
-{
-    "user_id"
-    "shop_id"  
-    "plan_id"
-}
+### Monitoring
+- Application logs: `backend/app/logs/latestfile.log`
+- Metrics: Available through Prometheus/Grafana
+- Performance monitoring: Custom Grafana dashboards
 
-user_shop_delete:
-{
-    "user_id":
-    "shop_id"
-}
+### Testing
+- Automated test data generation
+- Comprehensive API testing suite
+- Performance benchmarking tools
 
+## 📈 Data Flow
 
+```
+User Signs Up → Creates Shop → Pays Invoice → [Repeat/Churn]
+```
 
+### Event Types
+1. **User Account Creation**
+   ```json
+   {
+       "user_id": "string",
+       "email": "string"
+   }
+   ```
+2. **Shop Creation**
+   ```json
+   {
+       "user_id": "string",
+       "shop_id": "string",
+       "plan_id": "string"
+   }
+   ```
+3. **Account/Shop Deletion**
+4. **Payment Processing**
 
+## 🤝 Contributing
 
-----------------------------------------------------------------
-User Data (hourly)
-ts timestamp as a string of the hourly partition (partition key)
-pk user_id
-creation_timestamp: timestamp -- actual time of the event
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes
+4. Submit a pull request
 
+## 📝 License
 
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-----------------------------------------------------------------
-Shops Data (hourly)
-ts timestamp as a string of the hourly partition (partition key)
-pk shop_id
-creation_timestamp
-fk owner_user_id
+## 🔗 Additional Resources
 
-----------------------------------------------------------------
-Dim Plan (hourly)
-ts  timestamp as a string of the hourly partition (partition key)
-pk  plan_id
-invoice_amount
-
-
-----------------------------------------------------------------
-Payments data (daily)
-ds : the date stamp or date_id partion of the record
-pk payment_id : UUID a unique ID of the payment 
-fk invoice_id : UUID a unique id of the invoice the payment is mapped to
-fk user_id : the user_id of the payment
-
-
-----------------------------------------------------------------
-Invoices (daily) 
-ds : the date stamp or date_id partion of the record
-pk invoice_id : UUID a unique id of the invoice the payment is mapped to
-fk user_id : the user_id of the invoice
-fk shop_id : the id of the shop the invoice is associated with
-invoice_timestamp: timestamp the invoice was created on
-invoice_amount : amount of the invoice
-
-
-
-
-
-
+- API Documentation: `/docs` endpoint
+- Grafana Dashboards: `grafana/dashboards/`
+- Configuration Templates: Available in respective service directories
