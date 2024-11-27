@@ -1,36 +1,36 @@
 import logging
-from typing import List
-from pydantic import BaseModel, Field, ConfigDict
 import random
+from typing import List
 
 logger = logging.getLogger(__name__)
 
-class OddsMaker(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+class OddsMaker:
     """
     A class to generate odds and randomize data for user and shop simulations.
     """
-    max_fake_users_per_day: int = Field(default=2000, description="Maximum number of fake users that can be created per day")
-    max_fake_shops_per_day: int = Field(default=1500, description="Maximum number of fake shops that can be created per day")
-    max_user_growth_rate: float = Field(default=0.2, description="Maximum growth rate for users")
-    max_shop_growth_rate: float = Field(default=0.2, description="Maximum growth rate for shops")
-    user_shop_population: float = Field(default=0.5, description="Proportion of users who own shops")
-    shop_creation_chance: float = Field(default=0.8, description="Probability of a user creating a shop")
-    user_churn_chance: float = Field(default=0.2, description="Probability of a user churning")
-    shop_churn_chance: float = Field(default=0.3, description="Probability of a shop churning")
-    shops_to_generate: int = Field(default_factory=lambda: int(random.uniform(0, 2000)), description="Number of shops to generate")
-    random_seed: int = Field(default=42, description="Seed for random number generator")
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._rng = random.Random(self.random_seed)
-
-    @property
-    def rng(self):
-        """Get the random number generator instance."""
-        if not hasattr(self, '_rng'):
-            self._rng = random.Random(self.random_seed)
-        return self._rng
+    def __init__(
+        self,
+        max_fake_users_per_day: int = 2000,
+        max_fake_shops_per_day: int = 1500,
+        max_user_growth_rate: float = 0.2,
+        max_shop_growth_rate: float = 0.2,
+        user_shop_population: float = 0.5,
+        shop_creation_chance: float = 0.8,
+        user_churn_chance: float = 0.2,
+        shop_churn_chance: float = 0.3,
+        random_seed: int = 42
+    ):
+        self.max_fake_users_per_day = max_fake_users_per_day
+        self.max_fake_shops_per_day = max_fake_shops_per_day
+        self.max_user_growth_rate = max_user_growth_rate
+        self.max_shop_growth_rate = max_shop_growth_rate
+        self.user_shop_population = user_shop_population
+        self.shop_creation_chance = shop_creation_chance
+        self.user_churn_chance = user_churn_chance
+        self.shop_churn_chance = shop_churn_chance
+        self.random_seed = random_seed
+        self.shops_to_generate = int(random.uniform(0, 2000))
+        self.rng = random.Random(self.random_seed)
 
     async def gen_prop(self, p_list: List, propensity: float, max_value: int = None, r: bool = False) -> int:
         """
@@ -153,4 +153,4 @@ class OddsMaker(BaseModel):
     def set_random_seed(self, seed: int):
         """Set the random seed for this OddsMaker instance."""
         self.random_seed = seed
-        self._rng = random.Random(self.random_seed)
+        self.rng = random.Random(self.random_seed)
