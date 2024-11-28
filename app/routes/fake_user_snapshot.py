@@ -7,7 +7,7 @@ from ..database import get_db
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from ..models import FakeUser
+from ..models import User
 from ..schemas import FakeUserSnapshot, FakeUserSnapshotResponse
 from .helpers import retry_with_backoff
 
