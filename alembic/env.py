@@ -3,11 +3,19 @@ import sys
 import logging
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool, MetaData, DDL, event, text
-from sqlalchemy.schema import CreateSchema
+from sqlalchemy import engine_from_config, text
+from sqlalchemy import pool
 
 from alembic import context
+import alembic_postgresql_enum
+from alembic_postgresql_enum import Config
+
+# Configure alembic-postgresql-enum
+alembic_postgresql_enum.set_configuration(
+    Config(
+        add_type_ignore=True  # Ignore type creation in SQLAlchemy models
+    )
+)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -19,38 +27,67 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 # Import all models explicitly
 from app.models import *
 from app.models.enums import *
-from app.database import SQLALCHEMY_DATABASE_URL, engine, execute_ddl
+from app.database import SQLALCHEMY_DATABASE_URL, engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the database URL in the Alembic configuration
 config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
 
-# Combine all model metadata
+# Set schema for all tables
+for table in Base.metadata.tables.values():
+    table.schema = 'data_playground'
+
+# Get metadata with schema set
 target_metadata = Base.metadata
 
-# Prevent SQLAlchemy from auto-creating enum types
-for table in target_metadata.tables.values():
-    for column in table.columns:
-        if hasattr(column.type, 'create_type'):
-            column.type.create_type = False
+def include_name(name, type_, parent_names):
+    """Filter object names"""
+    if type_ == "schema":
+        # Only include data_playground schema
+        return name == "data_playground"
+    return True
+
+def include_object(object, name, type_, reflected, compare_to):
+    """Only include objects in data_playground schema"""
+    # For tables, check schema
+    if type_ == "table":
+        return getattr(object, "schema", None) == "data_playground"
+    
+    # For indexes, check if they belong to a data_playground table
+    if type_ == "index":
+        table_schema = getattr(object.table, "schema", None)
+        return table_schema == "data_playground"
+    
+    # For types/enums, only include those in data_playground schema
+    if type_ == "type":
+        schema = getattr(object, "schema", None)
+        return schema == "data_playground"
+    
+    # For columns, check if they belong to a data_playground table
+    if type_ == "column":
+        table_schema = getattr(object.table, "schema", None)
+        return table_schema == "data_playground"
+    
+    return True
+
+def create_schema(connection):
+    """Create data_playground schema if it doesn't exist"""
+    connection.execute(text("CREATE SCHEMA IF NOT EXISTS data_playground"))
+    connection.execute(text("SET search_path TO data_playground"))
 
 def create_enums(connection):
     """Create all enum types before any table creation"""
     logger.info("Creating enum types...")
     
     # Create schema if it doesn't exist
-    connection.execute(text("CREATE SCHEMA IF NOT EXISTS data_playground"))
-    
-    # Set search path to data_playground schema
-    connection.execute(text("SET search_path TO data_playground"))
+    create_schema(connection)
     
     # Create all enums from enums.py
     enums = [
@@ -69,12 +106,13 @@ def create_enums(connection):
         (ReviewType, "reviewtype"),
         (ReviewStatus, "reviewstatus"),
         (InventoryChangeType, "inventorychangetype"),
-        (EntityType, "entitytype")
+        (EntityType, "entitytype"),
+        (EventType, "eventtype")
     ]
     
     for enum_class, enum_name in enums:
         try:
-            # First check if the enum type exists
+            # Check if enum type exists
             check_sql = f"""
                 SELECT EXISTS (
                     SELECT 1 
@@ -87,7 +125,7 @@ def create_enums(connection):
             result = connection.execute(text(check_sql)).scalar()
             
             if not result:
-                # Enum doesn't exist, create it
+                # Create enum if it doesn't exist
                 enum_values = [f"'{e.value}'" for e in enum_class]
                 create_type_sql = f"""
                     CREATE TYPE data_playground.{enum_name} AS ENUM ({', '.join(enum_values)});
@@ -95,18 +133,11 @@ def create_enums(connection):
                 connection.execute(text(create_type_sql))
                 logger.info(f"Created enum type: {enum_name}")
             else:
-                logger.info(f"Enum type {enum_name} already exists, skipping creation")
+                logger.info(f"Enum type {enum_name} already exists")
                 
         except Exception as e:
             logger.error(f"Error handling enum {enum_name}: {str(e)}")
             raise
-
-def include_object(object, name, type_, reflected, compare_to):
-    """Determine which database objects to include in the migration."""
-    # Only include objects in data_playground schema
-    if hasattr(object, 'schema'):
-        return object.schema == 'data_playground'
-    return True
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -117,28 +148,38 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
-        version_table_schema='data_playground',
+        version_table="alembic_version",
+        version_table_schema="data_playground",
+        include_object=include_object,
+        include_name=include_name,
+        compare_type=True,
+        compare_server_default=True
     )
 
     with context.begin_transaction():
+        # Create schema first
+        context.execute("CREATE SCHEMA IF NOT EXISTS data_playground")
+        context.execute("SET search_path TO data_playground")
         context.run_migrations()
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     try:
         with engine.connect() as connection:
-            # Create enums first
-            # create_enums(connection)
+            # Create schema first
+            create_schema(connection)
             
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
                 include_schemas=True,
-                version_table_schema='data_playground',
+                version_table="alembic_version",
+                version_table_schema="data_playground",
                 include_object=include_object,
+                include_name=include_name,
                 compare_type=True,
                 compare_server_default=True,
-                transaction_per_migration=True,
+                transaction_per_migration=True
             )
 
             logger.info("Starting migrations")

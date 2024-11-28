@@ -3,143 +3,9 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enu
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
-import enum
 from sqlalchemy.ext.hybrid import hybrid_property
 from app.schemas import GlobalEventResponse
-
-class EventType(enum.Enum):
-    # User Account Events
-    user_account_creation = "user_account_creation"
-    user_delete_account = "user_delete_account"
-    user_deactivate_account = "user_deactivate_account"
-    user_reactivate_account = "user_reactivate_account"
-    user_login = "user_login"
-    user_logout = "user_logout"
-    user_profile_update = "user_profile_update"
-    user_password_change = "user_password_change"
-    user_email_change = "user_email_change"
-    
-    # Shop Events
-    shop_create = "shop_create"
-    shop_delete = "shop_delete"
-    shop_update = "shop_update"
-    shop_deactivate = "shop_deactivate"
-    shop_reactivate = "shop_reactivate"
-    shop_settings_update = "shop_settings_update"
-    
-    # Product Events
-    user_product_create = "user_product_create"
-    user_product_update = "user_product_update"
-    user_product_delete = "user_product_delete"
-    user_product_price_change = "user_product_price_change"
-    user_product_status_change = "user_product_status_change"
-    user_product_category_change = "user_product_category_change"
-    
-    # Order Events
-    user_order_placed = "user_order_placed"
-    user_order_updated = "user_order_updated"
-    user_order_cancelled = "user_order_cancelled"
-    user_order_processing = "user_order_processing"
-    user_order_shipped = "user_order_shipped"
-    user_order_delivered = "user_order_delivered"
-    user_order_returned = "user_order_returned"
-    user_order_refunded = "user_order_refunded"
-    
-    # Payment Events
-    user_payment_initiated = "user_payment_initiated"
-    user_payment_processing = "user_payment_processing"
-    user_payment_success = "user_payment_success"
-    user_payment_failed = "user_payment_failed"
-    user_payment_refunded = "user_payment_refunded"
-    user_payment_partially_refunded = "user_payment_partially_refunded"
-    user_payment_disputed = "user_payment_disputed"
-    user_payment_dispute_resolved = "user_payment_dispute_resolved"
-    
-    # Payment Method Events
-    user_payment_method_added = "user_payment_method_added"
-    user_payment_method_updated = "user_payment_method_updated"
-    user_payment_method_removed = "user_payment_method_removed"
-    user_payment_method_expired = "user_payment_method_expired"
-    user_payment_method_default_changed = "user_payment_method_default_changed"
-    
-    # Review Events
-    user_review_posted = "user_review_posted"
-    user_review_updated = "user_review_updated"
-    user_review_deleted = "user_review_deleted"
-    user_review_reported = "user_review_reported"
-    user_review_status_changed = "user_review_status_changed"
-    user_review_vote_added = "user_review_vote_added"
-    user_review_vote_removed = "user_review_vote_removed"
-    
-    # Promotion Events
-    user_promotion_created = "user_promotion_created"
-    user_promotion_updated = "user_promotion_updated"
-    user_promotion_activated = "user_promotion_activated"
-    user_promotion_deactivated = "user_promotion_deactivated"
-    user_promotion_used = "user_promotion_used"
-    user_promotion_expired = "user_promotion_expired"
-    user_promotion_limit_reached = "user_promotion_limit_reached"
-    
-    # Inventory Events
-    user_inventory_updated = "user_inventory_updated"
-    user_inventory_low = "user_inventory_low"
-    user_inventory_out = "user_inventory_out"
-    user_inventory_restocked = "user_inventory_restocked"
-    user_inventory_adjusted = "user_inventory_adjusted"
-    user_inventory_audit = "user_inventory_audit"
-    
-    # Invoice Events
-    user_invoice_created = "user_invoice_created"
-    user_invoice_updated = "user_invoice_updated"
-    user_invoice_paid = "user_invoice_paid"
-    user_invoice_cancelled = "user_invoice_cancelled"
-    user_invoice_overdue = "user_invoice_overdue"
-    user_invoice_reminder_sent = "user_invoice_reminder_sent"
-    
-    # Metric Events
-    user_metrics_updated = "user_metrics_updated"
-    shop_metrics_updated = "shop_metrics_updated"
-    user_product_metrics_updated = "user_product_metrics_updated"
-    user_metrics_rollup_started = "user_metrics_rollup_started"
-    user_metrics_rollup_completed = "user_metrics_rollup_completed"
-    user_metrics_rollup_failed = "user_metrics_rollup_failed"
-    
-    # System Events
-    user_system_startup = "user_system_startup"
-    user_system_shutdown = "user_system_shutdown"
-    user_system_maintenance_started = "user_system_maintenance_started"
-    user_system_maintenance_completed = "user_system_maintenance_completed"
-    user_system_backup_started = "user_system_backup_started"
-    user_system_backup_completed = "user_system_backup_completed"
-    user_system_restore_started = "user_system_restore_started"
-    user_system_restore_completed = "user_system_restore_completed"
-    
-    # Data Integrity Events
-    user_data_validation_started = "user_data_validation_started"
-    user_data_validation_completed = "user_data_validation_completed"
-    user_data_corruption_detected = "user_data_corruption_detected"
-    user_data_repair_started = "user_data_repair_started"
-    user_data_repair_completed = "user_data_repair_completed"
-    
-    # API and Rate Limiting Events
-    user_api_rate_limit_warning = "user_api_rate_limit_warning"
-    user_api_rate_limit_exceeded = "user_api_rate_limit_exceeded"
-    user_api_throttling_applied = "user_api_throttling_applied"
-    user_api_key_created = "user_api_key_created"
-    user_api_key_revoked = "user_api_key_revoked"
-    
-    # Security Events
-    user_security_suspicious_activity = "user_security_suspicious_activity"
-    user_security_login_attempt_failed = "user_security_login_attempt_failed"
-    user_security_password_reset = "user_security_password_reset"
-    user_security_2fa_enabled = "user_security_2fa_enabled"
-    user_security_2fa_disabled = "user_security_2fa_disabled"
-    
-    # Error Events
-    user_error_occurred = "user_error_occurred"
-    shop_error_occurred = "shop_error_occurred"
-    user_payment_error_occurred = "user_payment_error_occurred"
-    user_system_error_occurred = "user_system_error_occurred"
+from .enums import EventType
 
 class GlobalEvent(Base, PartitionedModel):
     """
@@ -178,6 +44,7 @@ class GlobalEvent(Base, PartitionedModel):
     event_type = Column(
         Enum(EventType), 
         nullable=False,
+        default=EventType.UNKNOWN_EVENT,
         index=True,
         comment="Type of event that occurred (e.g., user creation, payment, etc.)"
     )

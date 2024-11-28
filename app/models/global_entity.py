@@ -44,8 +44,10 @@ class GlobalEntity(Base, PartitionedModel):
     entity_type = Column(
         Enum(EntityType, schema='data_playground'), 
         nullable=False,
+        default=EntityType.UNKNOWN,
         index=True,
-        comment="Type of entity being tracked"
+        comment="Type of entity being tracked",
+        
     )
 
     # Timestamps
