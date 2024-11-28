@@ -42,7 +42,7 @@ class GlobalEvent(Base, PartitionedModel):
         comment="Timestamp when the event occurred (with timezone)"
     )
     event_type = Column(
-        Enum(EventType), 
+        Enum(EventType, schema='data_playground'), 
         nullable=False,
         default=EventType.UNKNOWN_EVENT,
         index=True,
@@ -99,7 +99,7 @@ class GlobalEvent(Base, PartitionedModel):
         # Foreign key constraint with partition key
         ForeignKeyConstraint(
             ['user_id', 'partition_key'],
-            ['data_playground.users.id', 'data_playground.users.partition_key'],  # Updated table name
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
             name='fk_global_event_user',
             comment="Foreign key relationship to the users table"
         ),
@@ -277,10 +277,10 @@ class GlobalEvent(Base, PartitionedModel):
         """Get error events"""
         query = db.query(cls).filter(
             cls.event_type.in_([
-                EventType.user_error_occurred,
-                EventType.shop_error_occurred,
-                EventType.user_payment_error_occurred,
-                EventType.user_system_error_occurred
+                EventType.ERROR_OCCURRED,
+                EventType.SHOP_ERROR,
+                EventType.PAYMENT_ERROR,
+                EventType.SYSTEM_ERROR
             ])
         )
         if error_types:
@@ -329,8 +329,8 @@ class GlobalEvent(Base, PartitionedModel):
         """Create a maintenance-related event"""
         metadata.update({
             'maintenance_type': maintenance_type,
-            'start_time': datetime.utcnow().isoformat() if 'started' in event_type.value else None,
-            'end_time': datetime.utcnow().isoformat() if 'completed' in event_type.value else None
+            'start_time': datetime.utcnow().isoformat() if 'STARTED' in event_type.value else None,
+            'end_time': datetime.utcnow().isoformat() if 'COMPLETED' in event_type.value else None
         })
         event = await cls.create_with_partition(
             db,
@@ -367,7 +367,7 @@ class GlobalEvent(Base, PartitionedModel):
         })
         event = await cls.create_with_partition(
             db,
-            event_type=EventType.user_data_corruption_detected,
+            event_type=EventType.DATA_CORRUPTION_DETECTED,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -450,12 +450,12 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_system_health_events(cls, db, start_time=None, end_time=None):
         """Get system health-related events"""
         system_event_types = [
-            EventType.user_system_startup,
-            EventType.user_system_shutdown,
-            EventType.user_system_maintenance_started,
-            EventType.user_system_maintenance_completed,
-            EventType.user_data_corruption_detected,
-            EventType.user_system_error_occurred
+            EventType.SYSTEM_STARTUP,
+            EventType.SYSTEM_SHUTDOWN,
+            EventType.MAINTENANCE_STARTED,
+            EventType.MAINTENANCE_COMPLETED,
+            EventType.DATA_CORRUPTION_DETECTED,
+            EventType.SYSTEM_ERROR
         ]
         return await cls.get_event_stats(db, event_types=system_event_types, start_time=start_time, end_time=end_time)
 
@@ -463,11 +463,11 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_security_events(cls, db, user_id=None, start_time=None, end_time=None):
         """Get security-related events"""
         security_event_types = [
-            EventType.user_security_suspicious_activity,
-            EventType.user_security_login_attempt_failed,
-            EventType.user_security_password_reset,
-            EventType.user_security_2fa_enabled,
-            EventType.user_security_2fa_disabled
+            EventType.SUSPICIOUS_ACTIVITY,
+            EventType.LOGIN_ATTEMPT_FAILED,
+            EventType.PASSWORD_RESET,
+            EventType.TWO_FACTOR_ENABLED,
+            EventType.TWO_FACTOR_DISABLED
         ]
         query = db.query(cls).filter(cls.event_type.in_(security_event_types))
         if user_id:
@@ -482,9 +482,9 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_metric_rollup_status(cls, db, metric_type=None, start_time=None, end_time=None):
         """Get metric rollup status"""
         metric_event_types = [
-            EventType.user_metrics_rollup_started,
-            EventType.user_metrics_rollup_completed,
-            EventType.user_metrics_rollup_failed
+            EventType.METRICS_ROLLUP_STARTED,
+            EventType.METRICS_ROLLUP_COMPLETED,
+            EventType.METRICS_ROLLUP_FAILED
         ]
         query = db.query(cls).filter(cls.event_type.in_(metric_event_types))
         if metric_type:
@@ -497,7 +497,7 @@ class GlobalEvent(Base, PartitionedModel):
         events = await query.order_by(cls.event_time.desc()).all()
         return {
             'total_rollups': len(events),
-            'successful_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_completed]),
-            'failed_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_failed]),
-            'in_progress_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_started])
+            'successful_rollups': len([e for e in events if e.event_type == EventType.METRICS_ROLLUP_COMPLETED]),
+            'failed_rollups': len([e for e in events if e.event_type == EventType.METRICS_ROLLUP_FAILED]),
+            'in_progress_rollups': len([e for e in events if e.event_type == EventType.METRICS_ROLLUP_STARTED])
         }
