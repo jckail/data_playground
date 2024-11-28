@@ -9,137 +9,137 @@ from app.schemas import GlobalEventResponse
 
 class EventType(enum.Enum):
     # User Account Events
-    fake_user_account_creation = "fake_user_account_creation"
-    fake_user_delete_account = "fake_user_delete_account"
-    fake_user_deactivate_account = "fake_user_deactivate_account"
-    fake_user_reactivate_account = "fake_user_reactivate_account"
-    fake_user_login = "fake_user_login"
-    fake_user_logout = "fake_user_logout"
-    fake_user_profile_update = "fake_user_profile_update"
-    fake_user_password_change = "fake_user_password_change"
-    fake_user_email_change = "fake_user_email_change"
+    user_account_creation = "user_account_creation"
+    user_delete_account = "user_delete_account"
+    user_deactivate_account = "user_deactivate_account"
+    user_reactivate_account = "user_reactivate_account"
+    user_login = "user_login"
+    user_logout = "user_logout"
+    user_profile_update = "user_profile_update"
+    user_password_change = "user_password_change"
+    user_email_change = "user_email_change"
     
     # Shop Events
-    fake_user_shop_create = "fake_user_shop_create"
-    fake_user_shop_delete = "fake_user_shop_delete"
-    fake_user_shop_update = "fake_user_shop_update"
-    fake_user_shop_deactivate = "fake_user_shop_deactivate"
-    fake_user_shop_reactivate = "fake_user_shop_reactivate"
-    fake_user_shop_settings_update = "fake_user_shop_settings_update"
+    shop_create = "shop_create"
+    shop_delete = "shop_delete"
+    shop_update = "shop_update"
+    shop_deactivate = "shop_deactivate"
+    shop_reactivate = "shop_reactivate"
+    shop_settings_update = "shop_settings_update"
     
     # Product Events
-    fake_user_product_create = "fake_user_product_create"
-    fake_user_product_update = "fake_user_product_update"
-    fake_user_product_delete = "fake_user_product_delete"
-    fake_user_product_price_change = "fake_user_product_price_change"
-    fake_user_product_status_change = "fake_user_product_status_change"
-    fake_user_product_category_change = "fake_user_product_category_change"
+    user_product_create = "user_product_create"
+    user_product_update = "user_product_update"
+    user_product_delete = "user_product_delete"
+    user_product_price_change = "user_product_price_change"
+    user_product_status_change = "user_product_status_change"
+    user_product_category_change = "user_product_category_change"
     
     # Order Events
-    fake_user_order_placed = "fake_user_order_placed"
-    fake_user_order_updated = "fake_user_order_updated"
-    fake_user_order_cancelled = "fake_user_order_cancelled"
-    fake_user_order_processing = "fake_user_order_processing"
-    fake_user_order_shipped = "fake_user_order_shipped"
-    fake_user_order_delivered = "fake_user_order_delivered"
-    fake_user_order_returned = "fake_user_order_returned"
-    fake_user_order_refunded = "fake_user_order_refunded"
+    user_order_placed = "user_order_placed"
+    user_order_updated = "user_order_updated"
+    user_order_cancelled = "user_order_cancelled"
+    user_order_processing = "user_order_processing"
+    user_order_shipped = "user_order_shipped"
+    user_order_delivered = "user_order_delivered"
+    user_order_returned = "user_order_returned"
+    user_order_refunded = "user_order_refunded"
     
     # Payment Events
-    fake_user_payment_initiated = "fake_user_payment_initiated"
-    fake_user_payment_processing = "fake_user_payment_processing"
-    fake_user_payment_success = "fake_user_payment_success"
-    fake_user_payment_failed = "fake_user_payment_failed"
-    fake_user_payment_refunded = "fake_user_payment_refunded"
-    fake_user_payment_partially_refunded = "fake_user_payment_partially_refunded"
-    fake_user_payment_disputed = "fake_user_payment_disputed"
-    fake_user_payment_dispute_resolved = "fake_user_payment_dispute_resolved"
+    user_payment_initiated = "user_payment_initiated"
+    user_payment_processing = "user_payment_processing"
+    user_payment_success = "user_payment_success"
+    user_payment_failed = "user_payment_failed"
+    user_payment_refunded = "user_payment_refunded"
+    user_payment_partially_refunded = "user_payment_partially_refunded"
+    user_payment_disputed = "user_payment_disputed"
+    user_payment_dispute_resolved = "user_payment_dispute_resolved"
     
     # Payment Method Events
-    fake_user_payment_method_added = "fake_user_payment_method_added"
-    fake_user_payment_method_updated = "fake_user_payment_method_updated"
-    fake_user_payment_method_removed = "fake_user_payment_method_removed"
-    fake_user_payment_method_expired = "fake_user_payment_method_expired"
-    fake_user_payment_method_default_changed = "fake_user_payment_method_default_changed"
+    user_payment_method_added = "user_payment_method_added"
+    user_payment_method_updated = "user_payment_method_updated"
+    user_payment_method_removed = "user_payment_method_removed"
+    user_payment_method_expired = "user_payment_method_expired"
+    user_payment_method_default_changed = "user_payment_method_default_changed"
     
     # Review Events
-    fake_user_review_posted = "fake_user_review_posted"
-    fake_user_review_updated = "fake_user_review_updated"
-    fake_user_review_deleted = "fake_user_review_deleted"
-    fake_user_review_reported = "fake_user_review_reported"
-    fake_user_review_status_changed = "fake_user_review_status_changed"
-    fake_user_review_vote_added = "fake_user_review_vote_added"
-    fake_user_review_vote_removed = "fake_user_review_vote_removed"
+    user_review_posted = "user_review_posted"
+    user_review_updated = "user_review_updated"
+    user_review_deleted = "user_review_deleted"
+    user_review_reported = "user_review_reported"
+    user_review_status_changed = "user_review_status_changed"
+    user_review_vote_added = "user_review_vote_added"
+    user_review_vote_removed = "user_review_vote_removed"
     
     # Promotion Events
-    fake_user_promotion_created = "fake_user_promotion_created"
-    fake_user_promotion_updated = "fake_user_promotion_updated"
-    fake_user_promotion_activated = "fake_user_promotion_activated"
-    fake_user_promotion_deactivated = "fake_user_promotion_deactivated"
-    fake_user_promotion_used = "fake_user_promotion_used"
-    fake_user_promotion_expired = "fake_user_promotion_expired"
-    fake_user_promotion_limit_reached = "fake_user_promotion_limit_reached"
+    user_promotion_created = "user_promotion_created"
+    user_promotion_updated = "user_promotion_updated"
+    user_promotion_activated = "user_promotion_activated"
+    user_promotion_deactivated = "user_promotion_deactivated"
+    user_promotion_used = "user_promotion_used"
+    user_promotion_expired = "user_promotion_expired"
+    user_promotion_limit_reached = "user_promotion_limit_reached"
     
     # Inventory Events
-    fake_user_inventory_updated = "fake_user_inventory_updated"
-    fake_user_inventory_low = "fake_user_inventory_low"
-    fake_user_inventory_out = "fake_user_inventory_out"
-    fake_user_inventory_restocked = "fake_user_inventory_restocked"
-    fake_user_inventory_adjusted = "fake_user_inventory_adjusted"
-    fake_user_inventory_audit = "fake_user_inventory_audit"
+    user_inventory_updated = "user_inventory_updated"
+    user_inventory_low = "user_inventory_low"
+    user_inventory_out = "user_inventory_out"
+    user_inventory_restocked = "user_inventory_restocked"
+    user_inventory_adjusted = "user_inventory_adjusted"
+    user_inventory_audit = "user_inventory_audit"
     
     # Invoice Events
-    fake_user_invoice_created = "fake_user_invoice_created"
-    fake_user_invoice_updated = "fake_user_invoice_updated"
-    fake_user_invoice_paid = "fake_user_invoice_paid"
-    fake_user_invoice_cancelled = "fake_user_invoice_cancelled"
-    fake_user_invoice_overdue = "fake_user_invoice_overdue"
-    fake_user_invoice_reminder_sent = "fake_user_invoice_reminder_sent"
+    user_invoice_created = "user_invoice_created"
+    user_invoice_updated = "user_invoice_updated"
+    user_invoice_paid = "user_invoice_paid"
+    user_invoice_cancelled = "user_invoice_cancelled"
+    user_invoice_overdue = "user_invoice_overdue"
+    user_invoice_reminder_sent = "user_invoice_reminder_sent"
     
     # Metric Events
-    fake_user_metrics_updated = "fake_user_metrics_updated"
-    fake_user_shop_metrics_updated = "fake_user_shop_metrics_updated"
-    fake_user_product_metrics_updated = "fake_user_product_metrics_updated"
-    fake_user_metrics_rollup_started = "fake_user_metrics_rollup_started"
-    fake_user_metrics_rollup_completed = "fake_user_metrics_rollup_completed"
-    fake_user_metrics_rollup_failed = "fake_user_metrics_rollup_failed"
+    user_metrics_updated = "user_metrics_updated"
+    shop_metrics_updated = "shop_metrics_updated"
+    user_product_metrics_updated = "user_product_metrics_updated"
+    user_metrics_rollup_started = "user_metrics_rollup_started"
+    user_metrics_rollup_completed = "user_metrics_rollup_completed"
+    user_metrics_rollup_failed = "user_metrics_rollup_failed"
     
     # System Events
-    fake_user_system_startup = "fake_user_system_startup"
-    fake_user_system_shutdown = "fake_user_system_shutdown"
-    fake_user_system_maintenance_started = "fake_user_system_maintenance_started"
-    fake_user_system_maintenance_completed = "fake_user_system_maintenance_completed"
-    fake_user_system_backup_started = "fake_user_system_backup_started"
-    fake_user_system_backup_completed = "fake_user_system_backup_completed"
-    fake_user_system_restore_started = "fake_user_system_restore_started"
-    fake_user_system_restore_completed = "fake_user_system_restore_completed"
+    user_system_startup = "user_system_startup"
+    user_system_shutdown = "user_system_shutdown"
+    user_system_maintenance_started = "user_system_maintenance_started"
+    user_system_maintenance_completed = "user_system_maintenance_completed"
+    user_system_backup_started = "user_system_backup_started"
+    user_system_backup_completed = "user_system_backup_completed"
+    user_system_restore_started = "user_system_restore_started"
+    user_system_restore_completed = "user_system_restore_completed"
     
     # Data Integrity Events
-    fake_user_data_validation_started = "fake_user_data_validation_started"
-    fake_user_data_validation_completed = "fake_user_data_validation_completed"
-    fake_user_data_corruption_detected = "fake_user_data_corruption_detected"
-    fake_user_data_repair_started = "fake_user_data_repair_started"
-    fake_user_data_repair_completed = "fake_user_data_repair_completed"
+    user_data_validation_started = "user_data_validation_started"
+    user_data_validation_completed = "user_data_validation_completed"
+    user_data_corruption_detected = "user_data_corruption_detected"
+    user_data_repair_started = "user_data_repair_started"
+    user_data_repair_completed = "user_data_repair_completed"
     
     # API and Rate Limiting Events
-    fake_user_api_rate_limit_warning = "fake_user_api_rate_limit_warning"
-    fake_user_api_rate_limit_exceeded = "fake_user_api_rate_limit_exceeded"
-    fake_user_api_throttling_applied = "fake_user_api_throttling_applied"
-    fake_user_api_key_created = "fake_user_api_key_created"
-    fake_user_api_key_revoked = "fake_user_api_key_revoked"
+    user_api_rate_limit_warning = "user_api_rate_limit_warning"
+    user_api_rate_limit_exceeded = "user_api_rate_limit_exceeded"
+    user_api_throttling_applied = "user_api_throttling_applied"
+    user_api_key_created = "user_api_key_created"
+    user_api_key_revoked = "user_api_key_revoked"
     
     # Security Events
-    fake_user_security_suspicious_activity = "fake_user_security_suspicious_activity"
-    fake_user_security_login_attempt_failed = "fake_user_security_login_attempt_failed"
-    fake_user_security_password_reset = "fake_user_security_password_reset"
-    fake_user_security_2fa_enabled = "fake_user_security_2fa_enabled"
-    fake_user_security_2fa_disabled = "fake_user_security_2fa_disabled"
+    user_security_suspicious_activity = "user_security_suspicious_activity"
+    user_security_login_attempt_failed = "user_security_login_attempt_failed"
+    user_security_password_reset = "user_security_password_reset"
+    user_security_2fa_enabled = "user_security_2fa_enabled"
+    user_security_2fa_disabled = "user_security_2fa_disabled"
     
     # Error Events
-    fake_user_error_occurred = "fake_user_error_occurred"
-    fake_user_shop_error_occurred = "fake_user_shop_error_occurred"
-    fake_user_payment_error_occurred = "fake_user_payment_error_occurred"
-    fake_user_system_error_occurred = "fake_user_system_error_occurred"
+    user_error_occurred = "user_error_occurred"
+    shop_error_occurred = "shop_error_occurred"
+    user_payment_error_occurred = "user_payment_error_occurred"
+    user_system_error_occurred = "user_system_error_occurred"
 
 class GlobalEvent(Base, PartitionedModel):
     """
@@ -149,7 +149,7 @@ class GlobalEvent(Base, PartitionedModel):
     Indexing Strategy:
     - Primary key (event_id, partition_key) for partitioning support
     - event_type is indexed for filtering specific types of events
-    - fake_user_id is indexed for user-specific event queries
+    - user_id is indexed for user-specific event queries
     - event_time is indexed for time-based queries and partitioning
     - Composite indexes for common query patterns
     
@@ -159,7 +159,7 @@ class GlobalEvent(Base, PartitionedModel):
     - Older partitions can be archived or dropped based on retention policy
     """
     __tablename__ = "global_events"
-    __partitiontype__ = "hourly"  # Already set to hourly
+    __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -172,13 +172,13 @@ class GlobalEvent(Base, PartitionedModel):
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Timestamp when the event occurred (with timezone)"
     )
     event_type = Column(
         Enum(EventType), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Type of event that occurred (e.g., user creation, payment, etc.)"
     )
     event_metadata = Column(
@@ -189,13 +189,13 @@ class GlobalEvent(Base, PartitionedModel):
     caller_entity_id = Column(
         UUID(as_uuid=True), 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="ID of the entity that triggered the event"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="ID of the user associated with this event (if applicable)"
     )
     
@@ -221,20 +221,20 @@ class GlobalEvent(Base, PartitionedModel):
         Index('ix_global_events_type_time', 'event_type', 'event_time'),
         
         # Composite index for user_id and event_time for user timeline queries
-        Index('ix_global_events_user_time', 'fake_user_id', 'event_time'),
+        Index('ix_global_events_user_time', 'user_id', 'event_time'),
         
         # Composite index for user_id and event_type for user-specific event type queries
-        Index('ix_global_events_user_type', 'fake_user_id', 'event_type'),
+        Index('ix_global_events_user_type', 'user_id', 'event_type'),
         
         # Composite index for caller_entity_id and event_time for entity timeline queries
         Index('ix_global_events_entity_time', 'caller_entity_id', 'event_time'),
         
         # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_global_event_fake_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],  # Updated table name
+            name='fk_global_event_user',
+            comment="Foreign key relationship to the users table"
         ),
         
         # Partitioning configuration
@@ -261,7 +261,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -274,7 +274,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -287,7 +287,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -303,7 +303,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -316,7 +316,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -329,7 +329,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -345,7 +345,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -358,7 +358,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -368,7 +368,7 @@ class GlobalEvent(Base, PartitionedModel):
     @classmethod
     async def get_user_events(cls, db, user_id, event_types=None, start_time=None, end_time=None):
         """Get events for a specific user"""
-        query = db.query(cls).filter(cls.fake_user_id == user_id)
+        query = db.query(cls).filter(cls.user_id == user_id)
         if event_types:
             query = query.filter(cls.event_type.in_(event_types))
         if start_time:
@@ -410,10 +410,10 @@ class GlobalEvent(Base, PartitionedModel):
         """Get error events"""
         query = db.query(cls).filter(
             cls.event_type.in_([
-                EventType.fake_user_error_occurred,
-                EventType.fake_user_shop_error_occurred,
-                EventType.fake_user_payment_error_occurred,
-                EventType.fake_user_system_error_occurred
+                EventType.user_error_occurred,
+                EventType.shop_error_occurred,
+                EventType.user_payment_error_occurred,
+                EventType.user_system_error_occurred
             ])
         )
         if error_types:
@@ -442,7 +442,7 @@ class GlobalEvent(Base, PartitionedModel):
                 event_type: len([e for e in events if e.event_type == event_type])
                 for event_type in EventType
             },
-            'unique_users': len(set(event.fake_user_id for event in events if event.fake_user_id))
+            'unique_users': len(set(event.user_id for event in events if event.user_id))
         }
 
     # Helper Methods for Event Creation
@@ -500,7 +500,7 @@ class GlobalEvent(Base, PartitionedModel):
         })
         event = await cls.create_with_partition(
             db,
-            event_type=EventType.fake_user_data_corruption_detected,
+            event_type=EventType.user_data_corruption_detected,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -518,7 +518,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -536,7 +536,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -554,7 +554,7 @@ class GlobalEvent(Base, PartitionedModel):
         event = await cls.create_with_partition(
             db,
             event_type=event_type,
-            fake_user_id=user_id,
+            user_id=user_id,
             event_time=datetime.utcnow(),
             event_metadata=metadata
         )
@@ -583,12 +583,12 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_system_health_events(cls, db, start_time=None, end_time=None):
         """Get system health-related events"""
         system_event_types = [
-            EventType.fake_user_system_startup,
-            EventType.fake_user_system_shutdown,
-            EventType.fake_user_system_maintenance_started,
-            EventType.fake_user_system_maintenance_completed,
-            EventType.fake_user_data_corruption_detected,
-            EventType.fake_user_system_error_occurred
+            EventType.user_system_startup,
+            EventType.user_system_shutdown,
+            EventType.user_system_maintenance_started,
+            EventType.user_system_maintenance_completed,
+            EventType.user_data_corruption_detected,
+            EventType.user_system_error_occurred
         ]
         return await cls.get_event_stats(db, event_types=system_event_types, start_time=start_time, end_time=end_time)
 
@@ -596,15 +596,15 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_security_events(cls, db, user_id=None, start_time=None, end_time=None):
         """Get security-related events"""
         security_event_types = [
-            EventType.fake_user_security_suspicious_activity,
-            EventType.fake_user_security_login_attempt_failed,
-            EventType.fake_user_security_password_reset,
-            EventType.fake_user_security_2fa_enabled,
-            EventType.fake_user_security_2fa_disabled
+            EventType.user_security_suspicious_activity,
+            EventType.user_security_login_attempt_failed,
+            EventType.user_security_password_reset,
+            EventType.user_security_2fa_enabled,
+            EventType.user_security_2fa_disabled
         ]
         query = db.query(cls).filter(cls.event_type.in_(security_event_types))
         if user_id:
-            query = query.filter(cls.fake_user_id == user_id)
+            query = query.filter(cls.user_id == user_id)
         if start_time:
             query = query.filter(cls.event_time >= start_time)
         if end_time:
@@ -615,9 +615,9 @@ class GlobalEvent(Base, PartitionedModel):
     async def get_metric_rollup_status(cls, db, metric_type=None, start_time=None, end_time=None):
         """Get metric rollup status"""
         metric_event_types = [
-            EventType.fake_user_metrics_rollup_started,
-            EventType.fake_user_metrics_rollup_completed,
-            EventType.fake_user_metrics_rollup_failed
+            EventType.user_metrics_rollup_started,
+            EventType.user_metrics_rollup_completed,
+            EventType.user_metrics_rollup_failed
         ]
         query = db.query(cls).filter(cls.event_type.in_(metric_event_types))
         if metric_type:
@@ -630,7 +630,7 @@ class GlobalEvent(Base, PartitionedModel):
         events = await query.order_by(cls.event_time.desc()).all()
         return {
             'total_rollups': len(events),
-            'successful_rollups': len([e for e in events if e.event_type == EventType.fake_user_metrics_rollup_completed]),
-            'failed_rollups': len([e for e in events if e.event_type == EventType.fake_user_metrics_rollup_failed]),
-            'in_progress_rollups': len([e for e in events if e.event_type == EventType.fake_user_metrics_rollup_started])
+            'successful_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_completed]),
+            'failed_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_failed]),
+            'in_progress_rollups': len([e for e in events if e.event_type == EventType.user_metrics_rollup_started])
         }

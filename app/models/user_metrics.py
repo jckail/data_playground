@@ -2,13 +2,13 @@ from .base import Base, PartitionedModel
 from sqlalchemy import Column, DateTime, Float, Integer, ForeignKeyConstraint, UUID, JSON
 from datetime import datetime
 
-class FakeUserMetricsHourly(Base, PartitionedModel):
-    __tablename__ = 'fake_user_metrics_hourly'
+class UserMetricsHourly(Base, PartitionedModel):
+    __tablename__ = 'user_metrics_hourly'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     id = Column(UUID(as_uuid=True), primary_key=True)
-    fake_user_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False)
     
     # Order Metrics
@@ -40,9 +40,9 @@ class FakeUserMetricsHourly(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_metrics_hourly_user'
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_user_metrics_hourly_user'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
@@ -50,13 +50,13 @@ class FakeUserMetricsHourly(Base, PartitionedModel):
         }
     )
 
-class FakeUserMetricsDaily(Base, PartitionedModel):
-    __tablename__ = 'fake_user_metrics_daily'
+class UserMetricsDaily(Base, PartitionedModel):
+    __tablename__ = 'user_metrics_daily'
     __partitiontype__ = "daily"
     __partition_field__ = "event_time"
 
     id = Column(UUID(as_uuid=True), primary_key=True)
-    fake_user_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False)
     
     # Order Metrics
@@ -88,9 +88,9 @@ class FakeUserMetricsDaily(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_metrics_daily_user'
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_user_metrics_daily_user'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',

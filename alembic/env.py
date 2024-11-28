@@ -3,7 +3,8 @@ import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
-from sqlalchemy import pool, MetaData
+from sqlalchemy import pool, MetaData, DDL, event
+from sqlalchemy.schema import CreateSchema
 
 from alembic import context
 
@@ -39,36 +40,39 @@ target_metadata = Base.metadata
 
 # List of tables that belong to our application with their schemas
 OUR_TABLES = {
-    'data_playground.global_entities',  # Added new global entities table
+    'data_playground.global_entities',
     'data_playground.global_events',
     'data_playground.odds_maker',
-    'data_playground.fake_user_payments',
+    'data_playground.payments',
     'data_playground.request_response_logs',
-    'data_playground.fake_user_shops',
-    'data_playground.fake_user_invoices',
-    'data_playground.fake_users',
-    'data_playground.fake_user_shop_products',
-    'data_playground.fake_user_shop_orders',
-    'data_playground.fake_user_shop_order_items',
-    'data_playground.fake_user_shop_reviews',
-    'data_playground.fake_user_shop_review_votes',
-    'data_playground.fake_user_shop_inventory_logs',
-    'data_playground.fake_user_shop_promotions',
-    'data_playground.fake_user_shop_promotion_usages',
-    'data_playground.fake_user_payment_methods',
-    'data_playground.fake_user_shop_order_payments',
+    'data_playground.shops',
+    'data_playground.invoices',
+    'data_playground.users',
+    'data_playground.shop_products',
+    'data_playground.shop_orders',
+    'data_playground.shop_order_items',
+    'data_playground.shop_reviews',
+    'data_playground.shop_review_votes',
+    'data_playground.shop_inventory_logs',
+    'data_playground.shop_promotions',
+    'data_playground.shop_promotion_usages',
+    'data_playground.payment_methods',
+    'data_playground.shop_order_payments',
     # Metric tables
-    'data_playground.fake_user_metrics_hourly',
-    'data_playground.fake_user_metrics_daily',
-    'data_playground.fake_user_shop_metrics_hourly',
-    'data_playground.fake_user_shop_metrics_daily',
-    'data_playground.fake_user_shop_product_metrics_hourly',
-    'data_playground.fake_user_shop_product_metrics_daily'
+    'data_playground.metrics_hourly',
+    'data_playground.metrics_daily',
+    'data_playground.shop_metrics_hourly',
+    'data_playground.shop_metrics_daily',
+    'data_playground.shop_product_metrics_hourly',
+    'data_playground.shop_product_metrics_daily'
 }
 
 def include_object(object, name, type_, reflected, compare_to):
-    # Always include enums
+    # Always include enums in data_playground schema
     if type_ == "type":
+        # Set schema for enum types
+        if hasattr(object, 'schema'):
+            object.schema = 'data_playground'
         return True
         
     if type_ == "table":
@@ -123,6 +127,11 @@ def run_migrations_online() -> None:
         )
 
         with connectable.connect() as connection:
+            # Create schema if it doesn't exist
+            connection.execute(CreateSchema('data_playground', if_not_exists=True))
+            # Set search_path to ensure types are created in data_playground schema
+            connection.execute(DDL('SET search_path TO data_playground'))
+
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
@@ -130,7 +139,7 @@ def run_migrations_online() -> None:
                 compare_type=True,
                 compare_server_default=True,
                 include_schemas=True,
-                version_table_schema='data_playground',  # Put alembic_version table in data_playground schema
+                version_table_schema='data_playground',
             )
 
             with context.begin_transaction():

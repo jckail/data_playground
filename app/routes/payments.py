@@ -34,7 +34,7 @@ def invoice_payment(payment: schemas.PaymentCreate, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail=f"Invalid datetime format for event_time: {e}")
 
     # Check if the invoice exists
-    invoice = db.query(models.UserInvoice).filter(models.UserInvoice.invoice_id == payment.invoice_id).first()
+    invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == payment.invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
@@ -64,7 +64,7 @@ def invoice_payment(payment: schemas.PaymentCreate, db: Session = Depends(get_db
 
     new_event = models.GlobalEvent(
         event_time=event_time,
-        event_type=models.EventType.user_shop_create,  # Assuming you have an event type for payments
+        event_type=models.EventType.shop_create,  # Assuming you have an event type for payments
         event_metadata=event_metadata,
         partition_key=models.GlobalEvent.generate_partition_key(event_time)
     )

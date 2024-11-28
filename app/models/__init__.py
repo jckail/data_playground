@@ -1,44 +1,44 @@
 from .base import Base, PartitionedModel, generate_partition_name
-from .fake_user import FakeUser
-from .shop import FakeUserShop, ShopCategory
-from .invoice import FakeUserInvoice, InvoiceStatus, PaymentTerms
-from .payment import FakeUserPayment, PaymentStatus, PaymentMethod
+from .user import User
+from .shop import Shop, ShopCategory
+from .invoice import Invoice, InvoiceStatus, PaymentTerms
+from .payment import UserPayment, PaymentStatus, PaymentMethod
 from .payment_method import (
-    FakeUserPaymentMethod, FakeUserShopOrderPayment,
+    UserPaymentMethod, ShopOrderPayment,
     PaymentMethodType, PaymentMethodStatus
 )
 from .global_event import GlobalEvent, EventType
 from .global_entity import GlobalEntity, EntityType
 from .RequestResponseLog import RequestResponseLog
 from .odds_maker import OddsMaker
-from .shop_product import FakeUserShopProduct, ProductCategory, ProductStatus
+from .shop_product import ShopProduct, ProductCategory, ProductStatus
 from .shop_order import (
-    FakeUserShopOrder, FakeUserShopOrderItem,
+    ShopOrder, ShopOrderItem,
     OrderStatus, ShippingMethod
 )
 from .shop_review import (
-    FakeUserShopReview, FakeUserShopReviewVote,
+    ShopReview, ShopReviewVote,
     ReviewType, ReviewStatus
 )
 from .shop_inventory import (
-    FakeUserShopInventoryLog,
+    ShopInventoryLog,
     InventoryChangeType
 )
 from .shop_promotion import (
-    FakeUserShopPromotion, FakeUserShopPromotionUsage,
+    ShopPromotion, ShopPromotionUsage,
     PromotionType, PromotionStatus, PromotionApplicability
 )
 from .user_metrics import (
-    FakeUserMetricsHourly,
-    FakeUserMetricsDaily
+    UserMetricsHourly,
+    UserMetricsDaily
 )
 from .shop_metrics import (
-    FakeUserShopMetricsHourly,
-    FakeUserShopMetricsDaily
+    ShopMetricsHourly,
+    ShopMetricsDaily
 )
 from .product_metrics import (
-    FakeUserShopProductMetricsHourly,
-    FakeUserShopProductMetricsDaily
+    ShopProductMetricsHourly,
+    ShopProductMetricsDaily
 )
 
 # Export all models
@@ -47,17 +47,17 @@ __all__ = [
     "Base", "PartitionedModel", "generate_partition_name",
     
     # User related
-    "FakeUser",
+    "User",
     
     # Shop related
-    "FakeUserShop", "ShopCategory",
+    "Shop", "ShopCategory",
     
     # Invoice related
-    "FakeUserInvoice", "InvoiceStatus", "PaymentTerms",
+    "Invoice", "InvoiceStatus", "PaymentTerms",
     
     # Payment related
-    "FakeUserPayment", "PaymentStatus", "PaymentMethod",
-    "FakeUserPaymentMethod", "FakeUserShopOrderPayment",
+    "UserPayment", "PaymentStatus", "PaymentMethod",
+    "UserPaymentMethod", "ShopOrderPayment",
     "PaymentMethodType", "PaymentMethodStatus",
     
     # Event and Entity related
@@ -71,25 +71,25 @@ __all__ = [
     "OddsMaker",
     
     # Product related
-    "FakeUserShopProduct", "ProductCategory", "ProductStatus",
+    "ShopProduct", "ProductCategory", "ProductStatus",
     
     # Order related
-    "FakeUserShopOrder", "FakeUserShopOrderItem",
+    "ShopOrder", "ShopOrderItem",
     "OrderStatus", "ShippingMethod",
     
     # Review related
-    "FakeUserShopReview", "FakeUserShopReviewVote",
+    "ShopReview", "ShopReviewVote",
     "ReviewType", "ReviewStatus",
     
     # Inventory related
-    "FakeUserShopInventoryLog", "InventoryChangeType",
+    "ShopInventoryLog", "InventoryChangeType",
     
     # Promotion related
-    "FakeUserShopPromotion", "FakeUserShopPromotionUsage",
+    "ShopPromotion", "ShopPromotionUsage",
     "PromotionType", "PromotionStatus", "PromotionApplicability",
     
     # Metrics related
-    "FakeUserMetricsHourly", "FakeUserMetricsDaily",
-    "FakeUserShopMetricsHourly", "FakeUserShopMetricsDaily",
-    "FakeUserShopProductMetricsHourly", "FakeUserShopProductMetricsDaily"
+    "UserMetricsHourly", "UserMetricsDaily",
+    "ShopMetricsHourly", "ShopMetricsDaily",
+    "ShopProductMetricsHourly", "ShopProductMetricsDaily"
 ]

@@ -3,7 +3,7 @@
 from pydantic import BaseModel, UUID4, Field
 from datetime import datetime
 
-class FakeUserInvoiceCreate(BaseModel):
+class FakeInvoiceCreate(BaseModel):
     fake_user_id: UUID4  # Updated from user_id
     shop_id: UUID4
     invoice_amount: float
@@ -12,7 +12,7 @@ class FakeUserInvoiceCreate(BaseModel):
     class Config:
         from_attributes = True
 
-class FakeUserInvoice(BaseModel):  # Updated from UserInvoice
+class FakeInvoice(BaseModel):  # Updated from Invoice
     invoice_id: UUID4
     fake_user_id: UUID4  # Updated from user_id
     shop_id: UUID4

@@ -3,34 +3,9 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, 
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
-import enum
+from .enums import PromotionType, PromotionStatus, PromotionApplicability
 
-class PromotionType(enum.Enum):
-    """Types of promotions that can be offered"""
-    PERCENTAGE = "percentage"  # Percentage off total
-    FIXED_AMOUNT = "fixed_amount"  # Fixed amount off total
-    BUY_X_GET_Y = "buy_x_get_y"  # Buy X items, get Y free/discounted
-    BUNDLE = "bundle"  # Discount on product bundles
-    FREE_SHIPPING = "free_shipping"  # Free shipping offer
-    MINIMUM_PURCHASE = "minimum_purchase"  # Discount with minimum spend
-
-class PromotionStatus(enum.Enum):
-    """Possible states for a promotion"""
-    DRAFT = "draft"  # Being created/edited
-    SCHEDULED = "scheduled"  # Set to start in future
-    ACTIVE = "active"  # Currently running
-    PAUSED = "paused"  # Temporarily suspended
-    ENDED = "ended"  # Naturally completed
-    CANCELLED = "cancelled"  # Manually stopped
-
-class PromotionApplicability(enum.Enum):
-    """What the promotion applies to"""
-    ALL_PRODUCTS = "all_products"  # Applies to entire shop
-    SPECIFIC_PRODUCTS = "specific_products"  # Only certain products
-    SPECIFIC_CATEGORIES = "specific_categories"  # Only certain categories
-    MINIMUM_ORDER = "minimum_order"  # Orders above threshold
-
-class FakeUserShopPromotion(Base, PartitionedModel):
+class ShopPromotion(Base, PartitionedModel):
     """
     Represents a promotional offer created by a shop. Promotions can offer
     various types of discounts and can be limited by time, usage, or
@@ -40,7 +15,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     - Primary key (id) is automatically indexed
     - promotion_type is indexed for filtering by promotion types
     - status is indexed for filtering active/inactive promotions
-    - fake_user_shop_id is indexed for shop-based queries
+    - shop_id is indexed for shop-based queries
     - valid_from/until are indexed for time-based queries
     - promo_code is indexed for code lookups
     - applicability is indexed for filtering by applicability
@@ -52,7 +27,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     - Each partition contains one hour of data
     - Older partitions can be archived or dropped based on retention policy
     """
-    __tablename__ = 'fake_user_shop_promotions'
+    __tablename__ = 'shop_promotions'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -63,7 +38,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         default=uuid.uuid4,
         comment="Unique identifier for the promotion"
     )
-    fake_user_shop_id = Column(
+    shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
@@ -83,16 +58,16 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         comment="Detailed description of the offer"
     )
     promotion_type = Column(
-        Enum(PromotionType), 
+        Enum(PromotionType, schema='data_playground'), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Type of discount offered"
     )
     status = Column(
-        Enum(PromotionStatus), 
+        Enum(PromotionStatus, schema='data_playground'), 
         nullable=False, 
         default=PromotionStatus.DRAFT,
-        index=True,  # Added index
+        index=True,
         comment="Current status of the promotion"
     )
     
@@ -153,9 +128,9 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     
     # Applicability
     applicability = Column(
-        Enum(PromotionApplicability), 
+        Enum(PromotionApplicability, schema='data_playground'), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="What items the promotion applies to"
     )
     applicable_product_ids = Column(
@@ -231,29 +206,29 @@ class FakeUserShopPromotion(Base, PartitionedModel):
     # Indexes for common queries
     __table_args__ = (
         # Unique constraint for promo code must include partition key
-        UniqueConstraint('promo_code', 'partition_key', name='uq_fake_user_shop_promotions_code'),
+        UniqueConstraint('promo_code', 'partition_key', name='uq_shop_promotions_code'),
         
         # Composite index for active promotions by shop
-        Index('ix_fake_user_shop_promotions_shop_status', 'fake_user_shop_id', 'status'),
+        Index('ix_shop_promotions_shop_status', 'shop_id', 'status'),
         
         # Composite index for valid promotions by time
-        Index('ix_fake_user_shop_promotions_validity', 'valid_from', 'valid_until', 'status'),
+        Index('ix_shop_promotions_validity', 'valid_from', 'valid_until', 'status'),
         
         # Composite index for promotions by type and status
-        Index('ix_fake_user_shop_promotions_type_status', 'promotion_type', 'status'),
+        Index('ix_shop_promotions_type_status', 'promotion_type', 'status'),
         
         # Composite index for promotions by applicability
-        Index('ix_fake_user_shop_promotions_applicability', 'applicability', 'status'),
+        Index('ix_shop_promotions_applicability', 'applicability', 'status'),
         
         # Composite index for usage tracking
-        Index('ix_fake_user_shop_promotions_usage', 'current_usage_count', 'usage_limit_total'),
+        Index('ix_shop_promotions_usage', 'current_usage_count', 'usage_limit_total'),
         
         # Foreign key constraint with partition key
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_promotion_shop',
-            comment="Foreign key relationship to the fake_user_shops table"
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_promotion_shop',
+            comment="Foreign key relationship to the shops table"
         ),
         
         # Partitioning configuration
@@ -281,7 +256,7 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         if not self.usage_limit_per_user:
             return True
         
-        user_usage_count = await self.usages.filter_by(fake_user_id=user_id).count()
+        user_usage_count = await self.usages.filter_by(user_id=user_id).count()
         return user_usage_count < self.usage_limit_per_user
 
     def is_applicable_to_product(self, product_id, product_category=None):
@@ -306,10 +281,10 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         if not await self.can_be_used_by_user(db, user_id):
             raise ValueError("User has exceeded usage limit")
         
-        usage = await FakeUserShopPromotionUsage.create_with_partition(
+        usage = await ShopPromotionUsage.create_with_partition(
             db,
             promotion_id=self.id,
-            fake_user_id=user_id,
+            user_id=user_id,
             order_id=order_id,
             discount_amount=discount_amount,
             **usage_data
@@ -325,19 +300,19 @@ class FakeUserShopPromotion(Base, PartitionedModel):
         """Get usage statistics for the promotion"""
         query = self.usages
         if start_time:
-            query = query.filter(FakeUserShopPromotionUsage.event_time >= start_time)
+            query = query.filter(ShopPromotionUsage.event_time >= start_time)
         if end_time:
-            query = query.filter(FakeUserShopPromotionUsage.event_time <= end_time)
+            query = query.filter(ShopPromotionUsage.event_time <= end_time)
         
         usages = await query.all()
         return {
             'total_uses': len(usages),
             'total_discount_amount': sum(usage.discount_amount for usage in usages),
             'average_discount': sum(usage.discount_amount for usage in usages) / len(usages) if usages else 0,
-            'unique_users': len(set(usage.fake_user_id for usage in usages))
+            'unique_users': len(set(usage.user_id for usage in usages))
         }
 
-class FakeUserShopPromotionUsage(Base, PartitionedModel):
+class ShopPromotionUsage(Base, PartitionedModel):
     """
     Records each use of a promotion, tracking who used it, when,
     and how much discount was applied.
@@ -345,13 +320,13 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
     Indexing Strategy:
     - Primary key (id) is automatically indexed
     - promotion_id is indexed for promotion-based queries
-    - fake_user_id is indexed for user-based queries
+    - user_id is indexed for user-based queries
     - order_id is indexed for order-based queries
     - created_time is indexed for time-based queries
     - event_time is indexed for partitioning
     - Composite indexes for common query patterns
     """
-    __tablename__ = 'fake_user_shop_promotion_usages'
+    __tablename__ = 'shop_promotion_usages'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -368,7 +343,7 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
         index=True,
         comment="ID of the promotion used"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
@@ -430,32 +405,32 @@ class FakeUserShopPromotionUsage(Base, PartitionedModel):
     # Indexes for common queries
     __table_args__ = (
         # Composite index for promotion usage by user
-        Index('ix_fake_user_shop_promotion_usages_user', 'promotion_id', 'fake_user_id'),
+        Index('ix_shop_promotion_usages_user', 'promotion_id', 'user_id'),
         
         # Composite index for promotion usage by order
-        Index('ix_fake_user_shop_promotion_usages_order', 'promotion_id', 'order_id'),
+        Index('ix_shop_promotion_usages_order', 'promotion_id', 'order_id'),
         
         # Composite index for promotion usage over time
-        Index('ix_fake_user_shop_promotion_usages_time', 'promotion_id', 'created_time'),
+        Index('ix_shop_promotion_usages_time', 'promotion_id', 'created_time'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
             ['promotion_id', 'partition_key'],
-            ['data_playground.fake_user_shop_promotions.id', 'data_playground.fake_user_shop_promotions.partition_key'],
-            name='fk_fake_user_shop_promotion_usage_promotion',
-            comment="Foreign key relationship to the fake_user_shop_promotions table"
+            ['data_playground.shop_promotions.id', 'data_playground.shop_promotions.partition_key'],
+            name='fk_shop_promotion_usage_promotion',
+            comment="Foreign key relationship to the shop_promotions table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_shop_promotion_usage_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_shop_promotion_usage_user',
+            comment="Foreign key relationship to the users table"
         ),
         ForeignKeyConstraint(
             ['order_id', 'partition_key'],
-            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
-            name='fk_fake_user_shop_promotion_usage_order',
-            comment="Foreign key relationship to the fake_user_shop_orders table"
+            ['data_playground.shop_orders.id', 'data_playground.shop_orders.partition_key'],
+            name='fk_shop_promotion_usage_order',
+            comment="Foreign key relationship to the shop_orders table"
         ),
         
         # Partitioning configuration

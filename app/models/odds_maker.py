@@ -16,7 +16,7 @@ class OddsMaker(Base):
     max_fake_shops_per_day = Column(Integer, default=150)
     max_user_growth_rate = Column(Float, default=0.2)
     max_shop_growth_rate = Column(Float, default=0.2)
-    user_shop_population = Column(Float, default=0.5)
+    shop_population = Column(Float, default=0.5)
     shop_creation_chance = Column(Float, default=0.8)
     user_churn_chance = Column(Float, default=0.2)
     shop_churn_chance = Column(Float, default=0.3)

@@ -3,22 +3,9 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, 
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
-import enum
+from .enums import ReviewType, ReviewStatus
 
-class ReviewType(enum.Enum):
-    """Types of reviews that can be created"""
-    SHOP = "shop"  # Review for the overall shop
-    PRODUCT = "product"  # Review for a specific product
-
-class ReviewStatus(enum.Enum):
-    """Possible states for a review"""
-    PENDING = "pending"  # Awaiting moderation
-    APPROVED = "approved"  # Visible to public
-    REJECTED = "rejected"  # Not approved for display
-    REPORTED = "reported"  # Flagged for review
-    REMOVED = "removed"  # Taken down after being live
-
-class FakeUserShopReview(Base, PartitionedModel):
+class ShopReview(Base, PartitionedModel):
     """
     Represents a review written by a user for a shop or product.
     Reviews can receive votes and affect shop/product metrics.
@@ -28,8 +15,8 @@ class FakeUserShopReview(Base, PartitionedModel):
     - review_type is indexed for filtering review types
     - status is indexed for filtering by moderation status
     - rating is indexed for rating-based queries
-    - fake_user_id is indexed for user-based queries
-    - fake_user_shop_id is indexed for shop-based queries
+    - user_id is indexed for user-based queries
+    - shop_id is indexed for shop-based queries
     - product_id is indexed for product-based queries
     - created_time is indexed for time-based queries
     - event_time is indexed for partitioning
@@ -40,7 +27,7 @@ class FakeUserShopReview(Base, PartitionedModel):
     - Each partition contains one hour of data
     - Older partitions can be archived or dropped based on retention policy
     """
-    __tablename__ = 'fake_user_shop_reviews'
+    __tablename__ = 'shop_reviews'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -51,13 +38,13 @@ class FakeUserShopReview(Base, PartitionedModel):
         default=uuid.uuid4,
         comment="Unique identifier for the review"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
         comment="ID of the user who wrote the review"
     )
-    fake_user_shop_id = Column(
+    shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
@@ -78,22 +65,22 @@ class FakeUserShopReview(Base, PartitionedModel):
     
     # Review Details
     review_type = Column(
-        Enum(ReviewType), 
+        Enum(ReviewType, schema='data_playground'), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Whether this is a shop or product review"
     )
     status = Column(
-        Enum(ReviewStatus), 
+        Enum(ReviewStatus, schema='data_playground'), 
         nullable=False, 
         default=ReviewStatus.PENDING,
-        index=True,  # Added index
+        index=True,
         comment="Current moderation status of the review"
     )
     rating = Column(
         Integer, 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Rating score (typically 1-5)"
     )
     title = Column(
@@ -112,21 +99,21 @@ class FakeUserShopReview(Base, PartitionedModel):
         Integer, 
         nullable=False, 
         default=0,
-        index=True,  # Added index
+        index=True,
         comment="Number of users who found this review helpful"
     )
     not_helpful_votes = Column(
         Integer, 
         nullable=False, 
         default=0,
-        index=True,  # Added index
+        index=True,
         comment="Number of users who found this review not helpful"
     )
     is_verified_purchase = Column(
         Boolean, 
         nullable=False, 
         default=False,
-        index=True,  # Added index
+        index=True,
         comment="Whether the reviewer purchased the item/used the shop"
     )
     
@@ -135,20 +122,20 @@ class FakeUserShopReview(Base, PartitionedModel):
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="When the review was written"
     )
     updated_time = Column(
         DateTime(timezone=True), 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="When the review was last edited"
     )
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="Timestamp used for partitioning"
     )
     
@@ -171,53 +158,53 @@ class FakeUserShopReview(Base, PartitionedModel):
     # Relationships
     # Votes cast on this review
     votes = relationship(
-        "FakeUserShopReviewVote",
+        "ShopReviewVote",
         backref=backref("review", lazy="joined"),
-        foreign_keys="FakeUserShopReviewVote.review_id",
+        foreign_keys="ShopReviewVote.review_id",
         lazy="dynamic"
     )
 
     # Indexes for common queries
     __table_args__ = (
         # Composite index for shop reviews by rating
-        Index('ix_fake_user_shop_reviews_shop_rating', 'fake_user_shop_id', 'rating', 'status'),
+        Index('ix_shop_reviews_shop_rating', 'shop_id', 'rating', 'status'),
         
         # Composite index for product reviews by rating
-        Index('ix_fake_user_shop_reviews_product_rating', 'product_id', 'rating', 'status'),
+        Index('ix_shop_reviews_product_rating', 'product_id', 'rating', 'status'),
         
         # Composite index for user reviews by type
-        Index('ix_fake_user_shop_reviews_user_type', 'fake_user_id', 'review_type', 'status'),
+        Index('ix_shop_reviews_user_type', 'user_id', 'review_type', 'status'),
         
         # Composite index for verified purchase reviews
-        Index('ix_fake_user_shop_reviews_verified', 'is_verified_purchase', 'rating', 'status'),
+        Index('ix_shop_reviews_verified', 'is_verified_purchase', 'rating', 'status'),
         
         # Composite index for helpful votes ranking
-        Index('ix_fake_user_shop_reviews_helpful', 'helpful_votes', 'status'),
+        Index('ix_shop_reviews_helpful', 'helpful_votes', 'status'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_shop_review_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_shop_review_user',
+            comment="Foreign key relationship to the users table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_review_shop',
-            comment="Foreign key relationship to the fake_user_shops table"
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_review_shop',
+            comment="Foreign key relationship to the shops table"
         ),
         ForeignKeyConstraint(
             ['product_id', 'partition_key'],
-            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
-            name='fk_fake_user_shop_review_product',
-            comment="Foreign key relationship to the fake_user_shop_products table"
+            ['data_playground.shop_products.id', 'data_playground.shop_products.partition_key'],
+            name='fk_shop_review_product',
+            comment="Foreign key relationship to the shop_products table"
         ),
         ForeignKeyConstraint(
             ['order_id', 'partition_key'],
-            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
-            name='fk_fake_user_shop_review_order',
-            comment="Foreign key relationship to the fake_user_shop_orders table"
+            ['data_playground.shop_orders.id', 'data_playground.shop_orders.partition_key'],
+            name='fk_shop_review_order',
+            comment="Foreign key relationship to the shop_orders table"
         ),
         
         # Partitioning configuration
@@ -231,10 +218,10 @@ class FakeUserShopReview(Base, PartitionedModel):
     # Helper Methods for Vote Operations
     async def add_vote(self, db, user_id, is_helpful):
         """Add a vote to the review"""
-        vote = await FakeUserShopReviewVote.create_with_partition(
+        vote = await ShopReviewVote.create_with_partition(
             db,
             review_id=self.id,
-            fake_user_id=user_id,
+            user_id=user_id,
             is_helpful=is_helpful
         )
         
@@ -275,7 +262,7 @@ class FakeUserShopReview(Base, PartitionedModel):
             return 0
         return (self.helpful_votes / total_votes) * 100
 
-class FakeUserShopReviewVote(Base, PartitionedModel):
+class ShopReviewVote(Base, PartitionedModel):
     """
     Represents a vote cast by a user on a review, indicating whether
     they found it helpful or not.
@@ -283,12 +270,12 @@ class FakeUserShopReviewVote(Base, PartitionedModel):
     Indexing Strategy:
     - Primary key (id) is automatically indexed
     - review_id is indexed for review-based queries
-    - fake_user_id is indexed for user-based queries
+    - user_id is indexed for user-based queries
     - is_helpful is indexed for helpful/not helpful filtering
     - event_time is indexed for partitioning
     - Composite indexes for common query patterns
     """
-    __tablename__ = 'fake_user_shop_review_votes'
+    __tablename__ = 'shop_review_votes'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -305,7 +292,7 @@ class FakeUserShopReviewVote(Base, PartitionedModel):
         index=True,
         comment="ID of the review being voted on"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
@@ -316,7 +303,7 @@ class FakeUserShopReviewVote(Base, PartitionedModel):
     is_helpful = Column(
         Boolean, 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Whether the user found the review helpful"
     )
     
@@ -325,14 +312,14 @@ class FakeUserShopReviewVote(Base, PartitionedModel):
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="When the vote was cast"
     )
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="Timestamp used for partitioning"
     )
     
@@ -355,23 +342,23 @@ class FakeUserShopReviewVote(Base, PartitionedModel):
     # Indexes for common queries
     __table_args__ = (
         # Composite index for user votes on reviews
-        Index('ix_fake_user_shop_review_votes_user_review', 'fake_user_id', 'review_id'),
+        Index('ix_shop_review_votes_user', 'user_id', 'review_id'),
         
         # Composite index for helpful votes by review
-        Index('ix_fake_user_shop_review_votes_helpful', 'review_id', 'is_helpful'),
+        Index('ix_shop_review_votes_helpful', 'review_id', 'is_helpful'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
             ['review_id', 'partition_key'],
-            ['data_playground.fake_user_shop_reviews.id', 'data_playground.fake_user_shop_reviews.partition_key'],
-            name='fk_fake_user_shop_review_vote_review',
-            comment="Foreign key relationship to the fake_user_shop_reviews table"
+            ['data_playground.shop_reviews.id', 'data_playground.shop_reviews.partition_key'],
+            name='fk_shop_review_vote_review',
+            comment="Foreign key relationship to the shop_reviews table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_shop_review_vote_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_shop_review_vote_user',
+            comment="Foreign key relationship to the users table"
         ),
         
         # Partitioning configuration

@@ -1,57 +1,57 @@
 # Data Model Documentation
 
-## Core Entities
+[Previous sections remain unchanged until Partitioning Strategy...]
 
-### GlobalEntity
-- Central registry for all entities in the system
-- Tracks creation time and type of every entity
-- Enables efficient cross-entity queries and lookups
-- Primary Key: (event_time, entity_id)
-- Relationships:
-  - Referenced by all other tables through entity_id
-- Partitioning:
-  - Daily partitioning by event_time
-  - Optimized for time-based queries
-- Key Indexes:
-  - (entity_type, event_time) for type-based lookups
-  - (entity_id, entity_type) for entity resolution
-  - (event_time, entity_id) for time-based queries
+## Partitioning Strategy
+
+All tables use range partitioning based on event_time:
+- Hourly partitioning for most operational tables (orders, payments, users, shops, products, etc.)
+- Daily partitioning for metric tables (UserMetricsDaily, ShopMetricsDaily, ProductMetricsDaily)
+- Partitioning key format: 
+  - Hourly tables: YYYY-MM-DDThh:00:00
+  - Daily tables: YYYY-MM-DD
+
+### Hourly Partitioned Tables
+- GlobalEntity
+- GlobalEvent
+- User
+- Shop
 
 ### FakeUser
 - Primary entity representing users in the system
 - Contains basic user information (email, username, status)
 - Referenced by most other entities as the owner/creator
 - Relationships:
-  - One-to-Many with FakeUserShop (as shop owner)
+  - One-to-Many with FakeShop (as shop owner)
   - One-to-Many with FakeUserPaymentMethod (stored payment methods)
-  - One-to-Many with FakeUserInvoice (as invoice recipient)
-  - One-to-Many with FakeUserShopOrder (as order placer)
-  - One-to-Many with FakeUserShopReview (as reviewer)
+  - One-to-Many with FakeInvoice (as invoice recipient)
+  - One-to-Many with FakeShopOrder (as order placer)
+  - One-to-Many with FakeShopReview (as reviewer)
   - One-to-Many with FakeUserMetricsHourly/Daily (user metrics)
 
-### FakeUserShop
+### FakeShop
 - Represents a shop owned by a FakeUser
 - Contains shop details (name, category, address)
 - Relationships:
   - Many-to-One with FakeUser (shop owner)
-  - One-to-Many with FakeUserShopProduct (products in shop)
-  - One-to-Many with FakeUserShopOrder (orders placed at shop)
-  - One-to-Many with FakeUserInvoice (invoices issued by shop)
-  - One-to-Many with FakeUserShopPromotion (shop promotions)
-  - One-to-Many with FakeUserShopReview (shop reviews)
-  - One-to-Many with FakeUserShopMetricsHourly/Daily (shop metrics)
+  - One-to-Many with FakeShopProduct (products in shop)
+  - One-to-Many with FakeShopOrder (orders placed at shop)
+  - One-to-Many with FakeInvoice (invoices issued by shop)
+  - One-to-Many with FakeShopPromotion (shop promotions)
+  - One-to-Many with FakeShopReview (shop reviews)
+  - One-to-Many with FakeShopMetricsHourly/Daily (shop metrics)
 
 ## Product Management
 
-### FakeUserShopProduct
+### FakeShopProduct
 - Represents products available in a shop
 - Contains product details (SKU, name, price, inventory)
 - Relationships:
-  - Many-to-One with FakeUserShop (shop offering product)
-  - One-to-Many with FakeUserShopOrderItem (product orders)
-  - One-to-Many with FakeUserShopInventoryLog (inventory changes)
-  - One-to-Many with FakeUserShopReview (product reviews)
-  - One-to-Many with FakeUserShopProductMetricsHourly/Daily (product metrics)
+  - Many-to-One with FakeShop (shop offering product)
+  - One-to-Many with FakeShopOrderItem (product orders)
+  - One-to-Many with FakeShopInventoryLog (inventory changes)
+  - One-to-Many with FakeShopReview (product reviews)
+  - One-to-Many with FakeShopProductMetricsHourly/Daily (product metrics)
 
 [Previous sections remain unchanged...]
 
@@ -70,7 +70,7 @@
   - Many-to-One with FakeUser
 
 ### Shop Metrics (Hourly/Daily)
-- FakeUserShopMetricsHourly and FakeUserShopMetricsDaily
+- FakeShopMetricsHourly and FakeShopMetricsDaily
 - Tracks shop performance and business metrics
 - Key metrics include:
   - Order volume and revenue
@@ -80,10 +80,10 @@
   - Promotion effectiveness
   - Inventory value
 - Relationships:
-  - Many-to-One with FakeUserShop
+  - Many-to-One with FakeShop
 
 ### Product Metrics (Hourly/Daily)
-- FakeUserShopProductMetricsHourly and FakeUserShopProductMetricsDaily
+- FakeShopProductMetricsHourly and FakeShopProductMetricsDaily
 - Tracks individual product performance
 - Key metrics include:
   - Sales volume and revenue
@@ -93,7 +93,7 @@
   - Promotion impact
   - Page views and cart interactions
 - Relationships:
-  - Many-to-One with FakeUserShopProduct
+  - Many-to-One with FakeShopProduct
 
 ## Entity Resolution and Tracking
 

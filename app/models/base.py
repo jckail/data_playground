@@ -1,13 +1,33 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, declared_attr
-from sqlalchemy import Column, String, text
+from sqlalchemy import Column, String, text, DDL, event, MetaData
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import declarative_mixin
 from sqlalchemy.exc import SQLAlchemyError
 
+# Create a naming convention for constraints and indexes
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+# Create metadata with naming convention and schema
+metadata = MetaData(
+    naming_convention=NAMING_CONVENTION,
+    schema="data_playground"
+)
+
 class Base(AsyncAttrs, DeclarativeBase):
-    pass
+    metadata = metadata
+
+    # Set schema for all models
+    @declared_attr.directive
+    def __table_args__(cls):
+        return {'schema': 'data_playground'}
 
 def generate_partition_name(tablename, partition_key):
     return f"{tablename}_p_{partition_key.replace('-', '_').replace(':', '_')}".lower()
@@ -109,3 +129,17 @@ class PartitionedModel:
         except Exception as e:
             await db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create {cls.__name__}: {str(e)}")
+
+# Event listener to ensure schema exists and is set as default
+@event.listens_for(Base.metadata, 'before_create')
+def create_schema(target, connection, **kw):
+    # Create schema if it doesn't exist
+    connection.execute(DDL('CREATE SCHEMA IF NOT EXISTS data_playground'))
+    # Set search_path to ensure types are created in data_playground schema
+    connection.execute(DDL('SET search_path TO data_playground'))
+
+# Event listener to ensure types are created in data_playground schema
+@event.listens_for(Base.metadata, 'after_create')
+def set_default_schema(target, connection, **kw):
+    # Reset search_path after creating tables
+    connection.execute(DDL('SET search_path TO public'))

@@ -3,28 +3,9 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, Boolean, 
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
-import enum
+from .enums import OrderStatus, ShippingMethod, PaymentStatus
 
-class OrderStatus(enum.Enum):
-    """Possible states for an order"""
-    PENDING = "pending"  # Order created but not processed
-    PROCESSING = "processing"  # Order being prepared
-    SHIPPED = "shipped"  # Order sent to customer
-    DELIVERED = "delivered"  # Order received by customer
-    CANCELLED = "cancelled"  # Order cancelled before completion
-    REFUNDED = "refunded"  # Order refunded after completion
-    ON_HOLD = "on_hold"  # Order temporarily suspended
-    RETURNED = "returned"  # Order returned by customer
-
-class ShippingMethod(enum.Enum):
-    """Available shipping methods"""
-    STANDARD = "standard"  # Regular shipping (3-5 days)
-    EXPRESS = "express"  # Expedited shipping (1-2 days)
-    OVERNIGHT = "overnight"  # Next-day delivery
-    LOCAL_PICKUP = "local_pickup"  # Customer picks up from store
-    INTERNATIONAL = "international"  # International shipping
-
-class FakeUserShopOrder(Base, PartitionedModel):
+class ShopOrder(Base, PartitionedModel):
     """
     Represents an order placed by a user at a shop. Orders contain items,
     handle payments, and track shipping status. They can also receive reviews
@@ -34,8 +15,8 @@ class FakeUserShopOrder(Base, PartitionedModel):
     - Primary key (id, partition_key) for partitioning support
     - order_number is indexed for quick order lookups
     - status is indexed for filtering orders by status
-    - fake_user_id is indexed for customer-based queries
-    - fake_user_shop_id is indexed for shop-based queries
+    - user_id is indexed for customer-based queries
+    - shop_id is indexed for shop-based queries
     - ordered_time is indexed for time-based queries
     - event_time is indexed for partitioning
     - shipping_method is indexed for shipping-based queries
@@ -46,7 +27,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
     - Each partition contains one hour of data
     - Older partitions can be archived or dropped based on retention policy
     """
-    __tablename__ = 'fake_user_shop_orders'
+    __tablename__ = 'shop_orders'
     __partitiontype__ = "hourly"  # Changed from daily to hourly
     __partition_field__ = "event_time"
 
@@ -63,13 +44,13 @@ class FakeUserShopOrder(Base, PartitionedModel):
         index=True,  # Added index
         comment="Human-readable order reference number"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,  # Added index
         comment="ID of the user who placed the order"
     )
-    fake_user_shop_id = Column(
+    shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,  # Added index
@@ -78,7 +59,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
     
     # Order Status
     status = Column(
-        Enum(OrderStatus), 
+        Enum(OrderStatus, schema='data_playground'), 
         nullable=False, 
         default=OrderStatus.PENDING,
         index=True,  # Added index
@@ -119,7 +100,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
     
     # Shipping Details
     shipping_method = Column(
-        Enum(ShippingMethod), 
+        Enum(ShippingMethod, schema='data_playground'), 
         nullable=True,
         index=True,  # Added index
         comment="Selected shipping method"
@@ -230,76 +211,76 @@ class FakeUserShopOrder(Base, PartitionedModel):
     # Relationships
     # Items included in this order
     items = relationship(
-        "FakeUserShopOrderItem",
+        "ShopOrderItem",
         backref=backref("order", lazy="joined"),
-        foreign_keys="FakeUserShopOrderItem.order_id",
+        foreign_keys="ShopOrderItem.order_id",
         lazy="dynamic"
     )
     
     # Payments made for this order
     payments = relationship(
-        "FakeUserShopOrderPayment",
+        "ShopOrderPayment",
         backref=backref("order", lazy="joined"),
-        foreign_keys="FakeUserShopOrderPayment.order_id",
+        foreign_keys="ShopOrderPayment.order_id",
         lazy="dynamic"
     )
     
     # Reviews for this order
     reviews = relationship(
-        "FakeUserShopReview",
+        "ShopReview",
         backref=backref("order", lazy="joined"),
-        foreign_keys="FakeUserShopReview.order_id",
+        foreign_keys="ShopReview.order_id",
         lazy="dynamic"
     )
     
     # Promotions used on this order
     promotion_usages = relationship(
-        "FakeUserShopPromotionUsage",
+        "ShopPromotionUsage",
         backref=backref("order", lazy="joined"),
-        foreign_keys="FakeUserShopPromotionUsage.order_id",
+        foreign_keys="ShopPromotionUsage.order_id",
         lazy="dynamic"
     )
     
     # Inventory changes related to this order
     inventory_logs = relationship(
-        "FakeUserShopInventoryLog",
+        "ShopInventoryLog",
         backref=backref("order", lazy="joined"),
-        foreign_keys="FakeUserShopInventoryLog.order_id",
+        foreign_keys="ShopInventoryLog.order_id",
         lazy="dynamic"
     )
 
     # Indexes for common queries
     __table_args__ = (
         # Unique constraint for order number must include partition key
-        UniqueConstraint('order_number', 'partition_key', name='uq_fake_user_shop_orders_number'),
+        UniqueConstraint('order_number', 'partition_key', name='uq_shop_orders_number'),
         
         # Composite index for shop and status for filtering orders by status within a shop
-        Index('ix_fake_user_shop_orders_shop_status', 'fake_user_shop_id', 'status'),
+        Index('ix_shop_orders_shop_status', 'shop_id', 'status'),
         
         # Composite index for user and status for filtering user's orders by status
-        Index('ix_fake_user_shop_orders_user_status', 'fake_user_id', 'status'),
+        Index('ix_shop_orders_user_status', 'user_id', 'status'),
         
         # Composite index for shop and ordered_time for time-based queries within a shop
-        Index('ix_fake_user_shop_orders_shop_ordered', 'fake_user_shop_id', 'ordered_time'),
+        Index('ix_shop_orders_shop_ordered', 'shop_id', 'ordered_time'),
         
         # Composite index for user and ordered_time for user's order history
-        Index('ix_fake_user_shop_orders_user_ordered', 'fake_user_id', 'ordered_time'),
+        Index('ix_shop_orders_user_ordered', 'user_id', 'ordered_time'),
         
         # Composite index for shipping-related queries
-        Index('ix_fake_user_shop_orders_shipping', 'shipping_method', 'shipping_country', 'shipping_state'),
+        Index('ix_shop_orders_shipping', 'shipping_method', 'shipping_country', 'shipping_state'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_shop_order_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_shop_order_user',
+            comment="Foreign key relationship to the users table"
         ),
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_order_shop',
-            comment="Foreign key relationship to the fake_user_shops table"
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_order_shop',
+            comment="Foreign key relationship to the shops table"
         ),
         
         # Partitioning configuration
@@ -310,12 +291,11 @@ class FakeUserShopOrder(Base, PartitionedModel):
         }
     )
 
-
     # Helper Methods for Order Items
     async def add_item(self, db, product_id, quantity, unit_price, **item_data):
         """Add an item to the order"""
-        from .shop_order_item import FakeUserShopOrderItem
-        item = await FakeUserShopOrderItem.create_with_partition(
+        from .shop_order_item import ShopOrderItem
+        item = await ShopOrderItem.create_with_partition(
             db,
             order_id=self.id,
             product_id=product_id,
@@ -331,16 +311,30 @@ class FakeUserShopOrder(Base, PartitionedModel):
         return await self.items.all()
 
     # Helper Methods for Payments
-    async def add_payment(self, db, payment_method_id, amount, **payment_data):
-        """Add a payment to the order"""
-        from .payment_method import FakeUserShopOrderPayment
-        payment = await FakeUserShopOrderPayment.create_with_partition(
+    async def record_payment(self, db, amount, payment_method, user_id, **payment_data):
+        """Record a payment for this order"""
+        from .ShopOrderPayments import ShopOrderPayment
+        
+        payment = await ShopOrderPayment.create_with_partition(
             db,
             order_id=self.id,
-            payment_method_id=payment_method_id,
+            user_id=user_id,
+            shop_id=self.shop_id,
             amount=amount,
+            method=payment_method,
+            status=PaymentStatus.PENDING,
             **payment_data
         )
+        
+        # Update order status based on payment
+        total_paid = sum(p.amount for p in await self.payments.filter_by(
+            status=PaymentStatus.COMPLETED
+        ).all())
+        
+        if total_paid + amount >= self.total_amount:
+            await self.update_status(db, OrderStatus.PROCESSING)
+        
+        await db.commit()
         return payment
 
     async def get_payments(self, db):
@@ -349,7 +343,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
 
     async def get_total_paid(self, db):
         """Calculate total amount paid"""
-        payments = await self.payments.all()
+        payments = await self.payments.filter_by(status=PaymentStatus.COMPLETED).all()
         return sum(payment.amount for payment in payments)
 
     # Helper Methods for Status Updates
@@ -388,12 +382,12 @@ class FakeUserShopOrder(Base, PartitionedModel):
     # Helper Methods for Reviews
     async def add_review(self, db, **review_data):
         """Add a review for the order"""
-        from .shop_review import FakeUserShopReview
-        review = await FakeUserShopReview.create_with_partition(
+        from .shop_review import ShopReview
+        review = await ShopReview.create_with_partition(
             db,
             order_id=self.id,
-            fake_user_id=self.fake_user_id,
-            fake_user_shop_id=self.fake_user_shop_id,
+            user_id=self.user_id,
+            shop_id=self.shop_id,
             **review_data
         )
         return review
@@ -402,7 +396,7 @@ class FakeUserShopOrder(Base, PartitionedModel):
         """Get all reviews for the order"""
         return await self.reviews.all()
 
-class FakeUserShopOrderItem(Base, PartitionedModel):
+class ShopOrderItem(Base, PartitionedModel):
     """
     Represents an individual item within an order, including quantity,
     pricing, and status information.
@@ -414,7 +408,7 @@ class FakeUserShopOrderItem(Base, PartitionedModel):
     - event_time is indexed for partitioning
     - Composite indexes for common query patterns
     """
-    __tablename__ = 'fake_user_shop_order_items'
+    __tablename__ = 'shop_order_items'
     __partitiontype__ = "hourly"  # Changed from daily to hourly
     __partition_field__ = "event_time"
 
@@ -519,26 +513,26 @@ class FakeUserShopOrderItem(Base, PartitionedModel):
     # Indexes for common queries
     __table_args__ = (
         # Composite index for order items by price
-        Index('ix_fake_user_shop_order_items_order_price', 'order_id', 'unit_price'),
+        Index('ix_shop_order_items_order_price', 'order_id', 'unit_price'),
         
         # Composite index for order items by quantity
-        Index('ix_fake_user_shop_order_items_order_quantity', 'order_id', 'quantity'),
+        Index('ix_shop_order_items_order_quantity', 'order_id', 'quantity'),
         
         # Composite index for cancelled/refunded items
-        Index('ix_fake_user_shop_order_items_status', 'is_cancelled', 'is_refunded'),
+        Index('ix_shop_order_items_status', 'is_cancelled', 'is_refunded'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
             ['order_id', 'partition_key'],
-            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
-            name='fk_fake_user_shop_order_item_order',
-            comment="Foreign key relationship to the fake_user_shop_orders table"
+            ['data_playground.shop_orders.id', 'data_playground.shop_orders.partition_key'],
+            name='fk_shop_order_item_order',
+            comment="Foreign key relationship to the shop_orders table"
         ),
         ForeignKeyConstraint(
             ['product_id', 'partition_key'],
-            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
-            name='fk_fake_user_shop_order_item_product',
-            comment="Foreign key relationship to the fake_user_shop_products table"
+            ['data_playground.shop_products.id', 'data_playground.shop_products.partition_key'],
+            name='fk_shop_order_item_product',
+            comment="Foreign key relationship to the shop_products table"
         ),
         
         # Partitioning configuration

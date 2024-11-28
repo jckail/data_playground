@@ -2,8 +2,8 @@ from .base import Base, PartitionedModel
 from sqlalchemy import Column, DateTime, Float, Integer, ForeignKeyConstraint, UUID, JSON, String
 from datetime import datetime
 
-class FakeUserShopProductMetricsHourly(Base, PartitionedModel):
-    __tablename__ = 'fake_user_shop_product_metrics_hourly'
+class ShopProductMetricsHourly(Base, PartitionedModel):
+    __tablename__ = 'shop_product_metrics_hourly'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -54,8 +54,8 @@ class FakeUserShopProductMetricsHourly(Base, PartitionedModel):
     __table_args__ = (
         ForeignKeyConstraint(
             ['product_id', 'partition_key'],
-            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
-            name='fk_fake_user_shop_product_metrics_hourly_product'
+            ['data_playground.shop_products.id', 'data_playground.shop_products.partition_key'],
+            name='fk_shop_product_metrics_hourly_product'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
@@ -63,8 +63,8 @@ class FakeUserShopProductMetricsHourly(Base, PartitionedModel):
         }
     )
 
-class FakeUserShopProductMetricsDaily(Base, PartitionedModel):
-    __tablename__ = 'fake_user_shop_product_metrics_daily'
+class ShopProductMetricsDaily(Base, PartitionedModel):
+    __tablename__ = 'shop_product_metrics_daily'
     __partitiontype__ = "daily"
     __partition_field__ = "event_time"
 
@@ -115,8 +115,8 @@ class FakeUserShopProductMetricsDaily(Base, PartitionedModel):
     __table_args__ = (
         ForeignKeyConstraint(
             ['product_id', 'partition_key'],
-            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
-            name='fk_fake_user_shop_product_metrics_daily_product'
+            ['data_playground.shop_products.id', 'data_playground.shop_products.partition_key'],
+            name='fk_shop_product_metrics_daily_product'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',

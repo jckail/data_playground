@@ -1,5 +1,6 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import CreateSchema
 import os
 import logging
 from sqlalchemy.exc import SQLAlchemyError
@@ -44,6 +45,14 @@ engine = create_engine(
     }
 )
 
+# Create data_playground schema if it doesn't exist
+@event.listens_for(engine, 'connect')
+def create_data_playground_schema(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("CREATE SCHEMA IF NOT EXISTS data_playground")
+    cursor.execute("SET search_path TO data_playground")
+    cursor.close()
+
 # Create sessionmaker
 SessionLocal = sessionmaker(
     bind=engine,
@@ -55,6 +64,8 @@ def get_db():
     """Provides a database session."""
     db = SessionLocal()
     try:
+        # Set search_path for this session
+        db.execute(text("SET search_path TO data_playground"))
         yield db
     finally:
         db.close()
@@ -67,6 +78,8 @@ def execute_query(query: str, retries=3):
         try:
             with SessionLocal() as session:
                 with session.begin():  # Start a transaction
+                    # Set search_path for this query
+                    session.execute(text("SET search_path TO data_playground"))
                     result = session.execute(text(query))
                     rows = result.fetchall()
                     return [dict(row._mapping) for row in rows]

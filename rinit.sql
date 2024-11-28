@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS shops (
     partition_key DATE GENERATED ALWAYS AS (created_time::date) STORED
 ) PARTITION BY RANGE (partition_key);
 
--- Create user_invoices table with partitioning by date
-CREATE TABLE IF NOT EXISTS user_invoices (
+-- Create invoices table with partitioning by date
+CREATE TABLE IF NOT EXISTS invoices (
     invoice_id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(user_id),
     shop_id UUID REFERENCES shops(shop_id),
@@ -50,14 +50,14 @@ CREATE TABLE IF NOT EXISTS user_invoices (
 -- Create payments table with partitioning by date
 CREATE TABLE IF NOT EXISTS payments (
     payment_id UUID PRIMARY KEY,
-    invoice_id UUID REFERENCES user_invoices(invoice_id),
+    invoice_id UUID REFERENCES invoices(invoice_id),
     payment_amount FLOAT NOT NULL,
     event_time TIMESTAMP WITH TIME ZONE NOT NULL,
     partition_key DATE GENERATED ALWAYS AS (event_time::date) STORED
 ) PARTITION BY RANGE (partition_key);
 
--- Example of creating a partition for a specific day for user_invoices
--- CREATE TABLE IF NOT EXISTS user_invoices_2024_08_16 PARTITION OF user_invoices
+-- Example of creating a partition for a specific day for invoices
+-- CREATE TABLE IF NOT EXISTS invoices_2024_08_16 PARTITION OF invoices
 -- FOR VALUES FROM ('2024-08-16') TO ('2024-08-17');
 
 -- Example of creating a partition for a specific day for payments
@@ -66,9 +66,9 @@ CREATE TABLE IF NOT EXISTS payments (
 
 -- Indexes for optimized querying
 
-CREATE INDEX IF NOT EXISTS idx_user_invoices_user_id ON user_invoices(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_invoices_shop_id ON user_invoices(shop_id);
-CREATE INDEX IF NOT EXISTS idx_user_invoices_event_time ON user_invoices(event_time);
+CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_shop_id ON invoices(shop_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_event_time ON invoices(event_time);
 
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_event_time ON payments(event_time);

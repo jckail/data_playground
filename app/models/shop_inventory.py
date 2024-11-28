@@ -3,22 +3,9 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enu
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime
-import enum
+from .enums import InventoryChangeType
 
-class InventoryChangeType(enum.Enum):
-    """Types of inventory changes that can occur"""
-    PURCHASE = "purchase"  # New stock purchased/received
-    SALE = "sale"  # Stock sold to customer
-    RETURN = "return"  # Customer return
-    ADJUSTMENT = "adjustment"  # Manual stock adjustment
-    LOSS = "loss"  # Damaged/lost inventory
-    RECOUNT = "recount"  # Physical inventory count
-    TRANSFER_IN = "transfer_in"  # Stock received from another location
-    TRANSFER_OUT = "transfer_out"  # Stock sent to another location
-    RESERVATION = "reservation"  # Stock reserved for order
-    RESERVATION_RELEASE = "reservation_release"  # Reserved stock released
-
-class FakeUserShopInventoryLog(Base, PartitionedModel):
+class ShopInventoryLog(Base, PartitionedModel):
     """
     Tracks all inventory changes for products in a shop, including purchases,
     sales, returns, and adjustments. Provides a complete audit trail of
@@ -27,7 +14,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     Indexing Strategy:
     - Primary key (id) is automatically indexed
     - change_type is indexed for filtering by change types
-    - fake_user_shop_id is indexed for shop-based queries
+    - shop_id is indexed for shop-based queries
     - product_id is indexed for product-based queries
     - order_id is indexed for order-based queries
     - created_by_user_id is indexed for user-based queries
@@ -41,7 +28,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     - Each partition contains one hour of data
     - Older partitions can be archived or dropped based on retention policy
     """
-    __tablename__ = 'fake_user_shop_inventory_logs'
+    __tablename__ = 'shop_inventory_logs'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
@@ -52,7 +39,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
         default=uuid.uuid4,
         comment="Unique identifier for the inventory log entry"
     )
-    fake_user_shop_id = Column(
+    shop_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         index=True,
@@ -73,27 +60,27 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     
     # Change Details
     change_type = Column(
-        Enum(InventoryChangeType), 
+        Enum(InventoryChangeType, schema='data_playground'), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Type of inventory change that occurred"
     )
     quantity_before = Column(
         Integer, 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Stock quantity before the change"
     )
     quantity_change = Column(
         Integer, 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Amount of change (positive or negative)"
     )
     quantity_after = Column(
         Integer, 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="Stock quantity after the change"
     )
     
@@ -101,13 +88,13 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     unit_cost = Column(
         Float, 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="Cost per unit for this change"
     )
     total_cost = Column(
         Float, 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="Total cost for this change"
     )
     
@@ -115,7 +102,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     reference_number = Column(
         String(100), 
         nullable=True,
-        index=True,  # Added index
+        index=True,
         comment="External reference (PO number, return number, etc.)"
     )
     reason = Column(
@@ -128,7 +115,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     created_by_user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
-        index=True,  # Added index
+        index=True,
         comment="ID of the user who made the change"
     )
     
@@ -137,14 +124,14 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="When the inventory change was recorded"
     )
     event_time = Column(
         DateTime(timezone=True), 
         nullable=False, 
         default=datetime.utcnow,
-        index=True,  # Added index
+        index=True,
         comment="Timestamp used for partitioning"
     )
     
@@ -172,44 +159,44 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     # Indexes for common queries
     __table_args__ = (
         # Composite index for shop inventory changes by type
-        Index('ix_fake_user_shop_inventory_shop_type', 'fake_user_shop_id', 'change_type'),
+        Index('ix_shop_inventory_shop_type', 'shop_id', 'change_type'),
         
         # Composite index for product inventory changes by type
-        Index('ix_fake_user_shop_inventory_product_type', 'product_id', 'change_type'),
+        Index('ix_shop_inventory_product_type', 'product_id', 'change_type'),
         
         # Composite index for order-related inventory changes
-        Index('ix_fake_user_shop_inventory_order', 'order_id', 'change_type'),
+        Index('ix_shop_inventory_order', 'order_id', 'change_type'),
         
         # Composite index for user-initiated changes
-        Index('ix_fake_user_shop_inventory_user_time', 'created_by_user_id', 'created_time'),
+        Index('ix_shop_inventory_user_time', 'created_by_user_id', 'created_time'),
         
         # Composite index for stock level tracking
-        Index('ix_fake_user_shop_inventory_levels', 'product_id', 'quantity_after', 'created_time'),
+        Index('ix_shop_inventory_levels', 'product_id', 'quantity_after', 'created_time'),
         
         # Foreign key constraints with partition key
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_inventory_log_shop',
-            comment="Foreign key relationship to the fake_user_shops table"
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_inventory_log_shop',
+            comment="Foreign key relationship to the shops table"
         ),
         ForeignKeyConstraint(
             ['product_id', 'partition_key'],
-            ['data_playground.fake_user_shop_products.id', 'data_playground.fake_user_shop_products.partition_key'],
-            name='fk_fake_user_shop_inventory_log_product',
-            comment="Foreign key relationship to the fake_user_shop_products table"
+            ['data_playground.shop_products.id', 'data_playground.shop_products.partition_key'],
+            name='fk_shop_inventory_log_product',
+            comment="Foreign key relationship to the shop_products table"
         ),
         ForeignKeyConstraint(
             ['order_id', 'partition_key'],
-            ['data_playground.fake_user_shop_orders.id', 'data_playground.fake_user_shop_orders.partition_key'],
-            name='fk_fake_user_shop_inventory_log_order',
-            comment="Foreign key relationship to the fake_user_shop_orders table"
+            ['data_playground.shop_orders.id', 'data_playground.shop_orders.partition_key'],
+            name='fk_shop_inventory_log_order',
+            comment="Foreign key relationship to the shop_orders table"
         ),
         ForeignKeyConstraint(
             ['created_by_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_shop_inventory_log_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_shop_inventory_log_user',
+            comment="Foreign key relationship to the users table"
         ),
         
         # Partitioning configuration
@@ -234,7 +221,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     @classmethod
     async def get_shop_history(cls, db, shop_id, start_time=None, end_time=None):
         """Get inventory history for a specific shop"""
-        query = db.query(cls).filter(cls.fake_user_shop_id == shop_id)
+        query = db.query(cls).filter(cls.shop_id == shop_id)
         if start_time:
             query = query.filter(cls.event_time >= start_time)
         if end_time:
@@ -245,7 +232,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     async def get_cost_analysis(cls, db, shop_id, start_time=None, end_time=None):
         """Get cost analysis for inventory changes"""
         query = db.query(cls).filter(
-            cls.fake_user_shop_id == shop_id,
+            cls.shop_id == shop_id,
             cls.unit_cost.isnot(None)
         )
         if start_time:
@@ -263,7 +250,7 @@ class FakeUserShopInventoryLog(Base, PartitionedModel):
     @classmethod
     async def get_movement_analysis(cls, db, shop_id, product_id=None, change_type=None):
         """Analyze inventory movement patterns"""
-        query = db.query(cls).filter(cls.fake_user_shop_id == shop_id)
+        query = db.query(cls).filter(cls.shop_id == shop_id)
         if product_id:
             query = query.filter(cls.product_id == product_id)
         if change_type:

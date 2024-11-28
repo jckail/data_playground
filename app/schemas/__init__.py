@@ -1,6 +1,6 @@
 from .fake_user import FakeUserCreate, FakeUserDeactivate, FakeUserResponse, FakeUserSnapshot, FakeUserSnapshotResponse
 from .shop import ShopCreate, ShopResponse, ShopDelete, ShopSnapshot, ShopSnapshotResponse
-from .invoice import FakeUserInvoiceCreate, FakeUserInvoice
+from .invoice import FakeInvoiceCreate, FakeInvoice
 from .payment import PaymentCreate, Payment
 from .global_event import GlobalEventCreate, GlobalEventResponse
 from .fake_data import FakeDataQuery
@@ -9,7 +9,7 @@ from .fake_data import FakeDataQuery
 __all__ = [
     "FakeUserCreate", "FakeUserDeactivate", "FakeUserResponse", "FakeUserSnapshot",
     "ShopCreate", "ShopResponse", "ShopDelete", "ShopSnapshot", "ShopSnapshotResponse",
-    "FakeUserInvoiceCreate", "FakeUserInvoice",
+    "FakeInvoiceCreate", "FakeInvoice",
     "PaymentCreate", "Payment",
     "GlobalEventCreate", "GlobalEventResponse", "FakeUserSnapshotResponse",
     "FakeDataQuery"

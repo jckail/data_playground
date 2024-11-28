@@ -47,7 +47,7 @@ class FakeDataGenerator(BaseModel):
     max_shop_growth_rate: float = Field(
         default=0.2, description="Maximum growth rate for shops"
     )
-    user_shop_population: float = Field(
+    shop_population: float = Field(
         default=0.5, description="Proportion of users who own shops"
     )
     shop_creation_chance: float = Field(
@@ -73,7 +73,7 @@ class FakeDataGenerator(BaseModel):
                 "max_user_growth_rate": 0.2,
                 "max_shop_growth_rate": 0.2,
 
-                "user_shop_population": 0.5,
+                "shop_population": 0.5,
                 "shop_creation_chance": 0.8,
                 
                 "user_churn_chance": 0.2,
@@ -108,7 +108,7 @@ async def trigger_fake_data_generation(fdg: FakeDataGenerator) -> ActionCounter:
         max_fake_shops_per_day=fdg.max_fake_shops_per_day,
         max_user_growth_rate=fdg.max_user_growth_rate,
         max_shop_growth_rate=fdg.max_shop_growth_rate,
-        user_shop_population=fdg.user_shop_population,
+        shop_population=fdg.shop_population,
         shop_creation_chance=fdg.shop_creation_chance,
         user_churn_chance=fdg.user_churn_chance,
         shop_churn_chance=fdg.shop_churn_chance,

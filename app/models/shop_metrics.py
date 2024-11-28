@@ -2,13 +2,13 @@ from .base import Base, PartitionedModel
 from sqlalchemy import Column, DateTime, Float, Integer, ForeignKeyConstraint, UUID, JSON, String
 from datetime import datetime
 
-class FakeUserShopMetricsHourly(Base, PartitionedModel):
-    __tablename__ = 'fake_user_shop_metrics_hourly'
+class ShopMetricsHourly(Base, PartitionedModel):
+    __tablename__ = 'shop_metrics_hourly'
     __partitiontype__ = "hourly"
     __partition_field__ = "event_time"
 
     id = Column(UUID(as_uuid=True), primary_key=True)
-    fake_user_shop_id = Column(UUID(as_uuid=True), nullable=False)
+    shop_id = Column(UUID(as_uuid=True), nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False)
     
     # Order Metrics
@@ -54,9 +54,9 @@ class FakeUserShopMetricsHourly(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_metrics_hourly_shop'
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_metrics_hourly_shop'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
@@ -64,13 +64,13 @@ class FakeUserShopMetricsHourly(Base, PartitionedModel):
         }
     )
 
-class FakeUserShopMetricsDaily(Base, PartitionedModel):
-    __tablename__ = 'fake_user_shop_metrics_daily'
+class ShopMetricsDaily(Base, PartitionedModel):
+    __tablename__ = 'shop_metrics_daily'
     __partitiontype__ = "daily"
     __partition_field__ = "event_time"
 
     id = Column(UUID(as_uuid=True), primary_key=True)
-    fake_user_shop_id = Column(UUID(as_uuid=True), nullable=False)
+    shop_id = Column(UUID(as_uuid=True), nullable=False)
     event_time = Column(DateTime(timezone=True), nullable=False)
     
     # Order Metrics
@@ -116,9 +116,9 @@ class FakeUserShopMetricsDaily(Base, PartitionedModel):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ['fake_user_shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_shop_metrics_daily_shop'
+            ['shop_id', 'partition_key'],
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_shop_metrics_daily_shop'
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',

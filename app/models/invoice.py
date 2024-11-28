@@ -3,35 +3,30 @@ from sqlalchemy import Column, DateTime, String, ForeignKeyConstraint, JSON, Enu
 from sqlalchemy.orm import relationship, backref
 import uuid
 from datetime import datetime, timedelta
-import enum
+from .enums import PaymentStatus, PaymentTerms
 
-class InvoiceStatus(enum.Enum):
-    """Possible states for an invoice"""
-    DRAFT = "draft"  # Being prepared
-    PENDING = "pending"  # Sent to customer
-    PAID = "paid"  # Fully paid
-    OVERDUE = "overdue"  # Past due date
-    CANCELLED = "cancelled"  # Cancelled before payment
-    REFUNDED = "refunded"  # Fully refunded
-    PARTIALLY_PAID = "partially_paid"  # Partially paid
-
-class PaymentTerms(enum.Enum):
-    """Available payment terms"""
-    IMMEDIATE = "immediate"  # Due immediately
-    NET_15 = "net_15"  # Due in 15 days
-    NET_30 = "net_30"  # Due in 30 days
-    NET_45 = "net_45"  # Due in 45 days
-    NET_60 = "net_60"  # Due in 60 days
-    CUSTOM = "custom"  # Custom payment terms
-
-class FakeUserInvoice(Base, PartitionedModel):
+class Invoice(Base, PartitionedModel):
     """
     Represents an invoice issued to a user. Invoices track amounts due,
     payment terms, and payment status. They can be linked to multiple
     payments and can be used across multiple orders.
+    
+    Indexing Strategy:
+    - Primary key (invoice_id, partition_key)
+    - invoice_number is indexed for unique constraint
+    - user_id is indexed for user-based queries
+    - shop_id is indexed for shop-based queries
+    - status is indexed for filtering by payment status
+    - event_time is indexed for partitioning
+    - Composite indexes for common query patterns
+    
+    Partitioning Strategy:
+    - Hourly partitioning based on event_time for efficient querying of recent data
+    - Each partition contains one hour of data
+    - Older partitions can be archived or dropped based on retention policy
     """
-    __tablename__ = 'fake_user_invoices'
-    __partitiontype__ = "daily"
+    __tablename__ = 'invoices'
+    __partitiontype__ = "hourly"  # Changed from daily to hourly
     __partition_field__ = "event_time"
 
     # Primary Fields
@@ -46,7 +41,7 @@ class FakeUserInvoice(Base, PartitionedModel):
         nullable=False,
         comment="Human-readable invoice reference number"
     )
-    fake_user_id = Column(
+    user_id = Column(
         UUID(as_uuid=True), 
         nullable=False,
         comment="ID of the user being invoiced"
@@ -83,13 +78,13 @@ class FakeUserInvoice(Base, PartitionedModel):
     
     # Status and Terms
     status = Column(
-        Enum(InvoiceStatus), 
+        Enum(PaymentStatus, schema='data_playground'), 
         nullable=False, 
-        default=InvoiceStatus.DRAFT,
+        default=PaymentStatus.DRAFT,
         comment="Current status of the invoice"
     )
     payment_terms = Column(
-        Enum(PaymentTerms), 
+        Enum(PaymentTerms, schema='data_playground'), 
         nullable=False,
         comment="Payment terms for this invoice"
     )
@@ -141,33 +136,33 @@ class FakeUserInvoice(Base, PartitionedModel):
     # Relationships
     # Payments made against this invoice
     payments = relationship(
-        "FakeUserPayment",
+        "InvoicePayment",
         backref=backref("invoice", lazy="joined"),
-        foreign_keys="FakeUserPayment.fake_user_invoice_id",
+        foreign_keys="InvoicePayment.invoice_id",
         lazy="dynamic"
     )
 
     __table_args__ = (
         # Unique constraint for invoice number must include partition key
-        UniqueConstraint('invoice_number', 'partition_key', name='uq_fake_user_invoices_number'),
+        UniqueConstraint('invoice_number', 'partition_key', name='uq_invoices_number'),
         
         # Foreign key constraints must include partition key
         ForeignKeyConstraint(
-            ['fake_user_id', 'partition_key'],
-            ['data_playground.fake_users.id', 'data_playground.fake_users.partition_key'],
-            name='fk_fake_user_invoice_user',
-            comment="Foreign key relationship to the fake_users table"
+            ['user_id', 'partition_key'],
+            ['data_playground.users.id', 'data_playground.users.partition_key'],
+            name='fk_user_invoice',
+            comment="Foreign key relationship to the users table"
         ),
         ForeignKeyConstraint(
             ['shop_id', 'partition_key'],
-            ['data_playground.fake_user_shops.id', 'data_playground.fake_user_shops.partition_key'],
-            name='fk_fake_user_invoice_shop',
-            comment="Foreign key relationship to the fake_user_shops table"
+            ['data_playground.shops.id', 'data_playground.shops.partition_key'],
+            name='fk_invoice_shop',
+            comment="Foreign key relationship to the shops table"
         ),
         {
             'postgresql_partition_by': 'RANGE (partition_key)',
             'schema': 'data_playground',
-            'comment': 'Stores invoice data for fake users'
+            'comment': 'Stores invoice data for users'
         }
     )
 
@@ -211,7 +206,7 @@ class FakeUserInvoice(Base, PartitionedModel):
         invoice = await cls.create_with_partition(
             db,
             invoice_number=invoice_number,
-            fake_user_id=user_id,
+            user_id=user_id,
             shop_id=shop_id,
             invoice_amount=amount,
             total_amount=amount,  # Will be updated with tax and discounts
@@ -223,51 +218,22 @@ class FakeUserInvoice(Base, PartitionedModel):
         
         return invoice
 
-    # Helper Methods for Payment Processing
-    async def record_payment(self, db, amount, payment_method, **payment_data):
-        """Record a payment for this invoice"""
-        from .payment import FakeUserPayment, PaymentStatus
-        
-        payment = await FakeUserPayment.create_with_partition(
-            db,
-            fake_user_invoice_id=self.invoice_id,
-            payment_amount=amount,
-            payment_method=payment_method,
-            payment_status=PaymentStatus.PENDING,
-            **payment_data
-        )
-        
-        # Update invoice status
-        total_paid = sum(p.payment_amount for p in await self.payments.filter_by(
-            payment_status=PaymentStatus.COMPLETED
-        ).all())
-        
-        if total_paid + amount >= self.total_amount:
-            self.status = InvoiceStatus.PAID
-        elif total_paid + amount > 0:
-            self.status = InvoiceStatus.PARTIALLY_PAID
-        
-        await db.commit()
-        return payment
-
     # Helper Methods for Status Management
     async def update_status(self, db):
         """Update invoice status based on payments and due date"""
-        from .payment import PaymentStatus
-        
-        if self.status in [InvoiceStatus.CANCELLED, InvoiceStatus.REFUNDED]:
+        if self.status in [PaymentStatus.CANCELLED, PaymentStatus.REFUNDED]:
             return
         
-        total_paid = sum(p.payment_amount for p in await self.payments.filter_by(
-            payment_status=PaymentStatus.COMPLETED
+        total_paid = sum(p.amount for p in await self.payments.filter_by(
+            status=PaymentStatus.COMPLETED
         ).all())
         
         if total_paid >= self.total_amount:
-            self.status = InvoiceStatus.PAID
+            self.status = PaymentStatus.PAID
         elif total_paid > 0:
-            self.status = InvoiceStatus.PARTIALLY_PAID
+            self.status = PaymentStatus.PARTIALLY_PAID
         elif datetime.utcnow() > self.due_date:
-            self.status = InvoiceStatus.OVERDUE
+            self.status = PaymentStatus.OVERDUE
         
         await db.commit()
 
@@ -277,7 +243,7 @@ class FakeUserInvoice(Base, PartitionedModel):
         """Get invoice statistics"""
         query = db.query(cls)
         if user_id:
-            query = query.filter_by(fake_user_id=user_id)
+            query = query.filter_by(user_id=user_id)
         if shop_id:
             query = query.filter_by(shop_id=shop_id)
         if start_date:
@@ -289,11 +255,11 @@ class FakeUserInvoice(Base, PartitionedModel):
         return {
             'total_invoices': len(invoices),
             'total_amount': sum(inv.total_amount for inv in invoices),
-            'paid_invoices': len([inv for inv in invoices if inv.status == InvoiceStatus.PAID]),
-            'overdue_invoices': len([inv for inv in invoices if inv.status == InvoiceStatus.OVERDUE]),
+            'paid_invoices': len([inv for inv in invoices if inv.status == PaymentStatus.PAID]),
+            'overdue_invoices': len([inv for inv in invoices if inv.status == PaymentStatus.OVERDUE]),
             'average_amount': sum(inv.total_amount for inv in invoices) / len(invoices) if invoices else 0,
             'status_breakdown': {
                 status: len([inv for inv in invoices if inv.status == status])
-                for status in InvoiceStatus
+                for status in PaymentStatus
             }
         }
