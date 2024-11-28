@@ -74,20 +74,17 @@ class GlobalEntity(Base, PartitionedModel):
         # Index for looking up entities by type
         Index('idx_global_entity_type_time', 
               entity_type, event_time,
-              postgresql_using='btree',
-              comment="Index for filtering entities by type and time"),
+              postgresql_using='btree'),
               
         # Index for looking up entities by ID
         Index('idx_global_entity_id_type', 
               entity_id, entity_type,
-              postgresql_using='btree',
-              comment="Index for filtering entities by ID and type"),
+              postgresql_using='btree'),
               
         # Index for time-based queries
         Index('idx_global_entity_time_id', 
               event_time, entity_id,
-              postgresql_using='btree',
-              comment="Index for time-based entity queries"),
+              postgresql_using='btree'),
               
         # Partitioning configuration
         {

@@ -1,12 +1,11 @@
 from .base import Base, PartitionedModel, generate_partition_name
 from .user import User
 from .shop import Shop, ShopCategory
-from .invoice import Invoice, InvoiceStatus, PaymentTerms
-from .payment import UserPayment, PaymentStatus, PaymentMethod
-from .payment_method import (
-    UserPaymentMethod, ShopOrderPayment,
-    PaymentMethodType, PaymentMethodStatus
-)
+from .invoice import Invoice, PaymentTerms
+from .InvoicePayments import InvoicePayment
+from .ShopOrderPayments import ShopOrderPayment
+
+from .UserPaymentMethod import UserPaymentMethod
 from .global_event import GlobalEvent, EventType
 from .global_entity import GlobalEntity, EntityType
 from .RequestResponseLog import RequestResponseLog
@@ -53,12 +52,11 @@ __all__ = [
     "Shop", "ShopCategory",
     
     # Invoice related
-    "Invoice", "InvoiceStatus", "PaymentTerms",
+    "Invoice", "PaymentTerms",
     
     # Payment related
-    "UserPayment", "PaymentStatus", "PaymentMethod",
-    "UserPaymentMethod", "ShopOrderPayment",
-    "PaymentMethodType", "PaymentMethodStatus",
+    "InvoicePayment", "ShopOrderPayment", 
+    "UserPaymentMethod",  
     
     # Event and Entity related
     "GlobalEvent", "EventType",

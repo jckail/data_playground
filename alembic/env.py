@@ -1,19 +1,25 @@
 import os
 import sys
+import logging
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
-from sqlalchemy import pool, MetaData, DDL, event
+from sqlalchemy import pool, MetaData, DDL, event, text
 from sqlalchemy.schema import CreateSchema
 
 from alembic import context
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("alembic")
 
 # Add the parent directory of 'app' to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 # Import all models explicitly
 from app.models import *
-from app.database import SQLALCHEMY_DATABASE_URL
+from app.models.enums import *
+from app.database import SQLALCHEMY_DATABASE_URL, engine, execute_ddl
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -27,67 +33,79 @@ if config.config_file_name is not None:
 # Set the database URL in the Alembic configuration
 config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
 
-# Create a metadata object specifically for our tables
-def combine_metadata(*args):
-    m = MetaData()
-    for metadata in args:
-        for t in metadata.tables.values():
-            t.tometadata(m)
-    return m
-
 # Combine all model metadata
 target_metadata = Base.metadata
 
-# List of tables that belong to our application with their schemas
-OUR_TABLES = {
-    'data_playground.global_entities',
-    'data_playground.global_events',
-    'data_playground.odds_maker',
-    'data_playground.payments',
-    'data_playground.request_response_logs',
-    'data_playground.shops',
-    'data_playground.invoices',
-    'data_playground.users',
-    'data_playground.shop_products',
-    'data_playground.shop_orders',
-    'data_playground.shop_order_items',
-    'data_playground.shop_reviews',
-    'data_playground.shop_review_votes',
-    'data_playground.shop_inventory_logs',
-    'data_playground.shop_promotions',
-    'data_playground.shop_promotion_usages',
-    'data_playground.payment_methods',
-    'data_playground.shop_order_payments',
-    # Metric tables
-    'data_playground.metrics_hourly',
-    'data_playground.metrics_daily',
-    'data_playground.shop_metrics_hourly',
-    'data_playground.shop_metrics_daily',
-    'data_playground.shop_product_metrics_hourly',
-    'data_playground.shop_product_metrics_daily'
-}
+# Prevent SQLAlchemy from auto-creating enum types
+for table in target_metadata.tables.values():
+    for column in table.columns:
+        if hasattr(column.type, 'create_type'):
+            column.type.create_type = False
+
+def create_enums(connection):
+    """Create all enum types before any table creation"""
+    logger.info("Creating enum types...")
+    
+    # Create schema if it doesn't exist
+    connection.execute(text("CREATE SCHEMA IF NOT EXISTS data_playground"))
+    
+    # Set search path to data_playground schema
+    connection.execute(text("SET search_path TO data_playground"))
+    
+    # Create all enums from enums.py
+    enums = [
+        (PaymentMethodType, "paymentmethodtype"),
+        (PaymentMethodStatus, "paymentmethodstatus"),
+        (PaymentStatus, "paymentstatus"),
+        (OrderStatus, "orderstatus"),
+        (ShippingMethod, "shippingmethod"),
+        (PaymentTerms, "paymentterms"),
+        (ShopCategory, "shopcategory"),
+        (ProductCategory, "productcategory"),
+        (ProductStatus, "productstatus"),
+        (PromotionType, "promotiontype"),
+        (PromotionStatus, "promotionstatus"),
+        (PromotionApplicability, "promotionapplicability"),
+        (ReviewType, "reviewtype"),
+        (ReviewStatus, "reviewstatus"),
+        (InventoryChangeType, "inventorychangetype"),
+        (EntityType, "entitytype")
+    ]
+    
+    for enum_class, enum_name in enums:
+        try:
+            # First check if the enum type exists
+            check_sql = f"""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM pg_type t 
+                    JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace 
+                    WHERE t.typname = '{enum_name}' 
+                    AND n.nspname = 'data_playground'
+                );
+            """
+            result = connection.execute(text(check_sql)).scalar()
+            
+            if not result:
+                # Enum doesn't exist, create it
+                enum_values = [f"'{e.value}'" for e in enum_class]
+                create_type_sql = f"""
+                    CREATE TYPE data_playground.{enum_name} AS ENUM ({', '.join(enum_values)});
+                """
+                connection.execute(text(create_type_sql))
+                logger.info(f"Created enum type: {enum_name}")
+            else:
+                logger.info(f"Enum type {enum_name} already exists, skipping creation")
+                
+        except Exception as e:
+            logger.error(f"Error handling enum {enum_name}: {str(e)}")
+            raise
 
 def include_object(object, name, type_, reflected, compare_to):
-    # Always include enums in data_playground schema
-    if type_ == "type":
-        # Set schema for enum types
-        if hasattr(object, 'schema'):
-            object.schema = 'data_playground'
-        return True
-        
-    if type_ == "table":
-        # Get schema and table name
-        schema = object.schema if hasattr(object, 'schema') else 'data_playground'
-        full_name = f"{schema}.{name}"
-        return full_name in OUR_TABLES
-    
-    if type_ == "index":
-        # Only include indexes if they're on our tables
-        if hasattr(object, 'table'):
-            schema = object.table.schema if hasattr(object.table, 'schema') else 'data_playground'
-            table_full_name = f"{schema}.{object.table.name}"
-            return table_full_name in OUR_TABLES
-    
+    """Determine which database objects to include in the migration."""
+    # Only include objects in data_playground schema
+    if hasattr(object, 'schema'):
+        return object.schema == 'data_playground'
     return True
 
 def run_migrations_offline() -> None:
@@ -98,9 +116,6 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        include_object=include_object,
-        compare_type=True,
-        compare_server_default=True,
         include_schemas=True,
         version_table_schema='data_playground',
     )
@@ -111,42 +126,28 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     try:
-        # Get alembic section config
-        configuration = config.get_section(config.config_ini_section)
-        
-        # Add SSL mode
-        configuration["sqlalchemy.connect_args"] = {
-            'sslmode': 'require',
-            'connect_timeout': 10
-        }
-
-        connectable = engine_from_config(
-            configuration,
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-        )
-
-        with connectable.connect() as connection:
-            # Create schema if it doesn't exist
-            connection.execute(CreateSchema('data_playground', if_not_exists=True))
-            # Set search_path to ensure types are created in data_playground schema
-            connection.execute(DDL('SET search_path TO data_playground'))
-
+        with engine.connect() as connection:
+            # Create enums first
+            # create_enums(connection)
+            
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
+                include_schemas=True,
+                version_table_schema='data_playground',
                 include_object=include_object,
                 compare_type=True,
                 compare_server_default=True,
-                include_schemas=True,
-                version_table_schema='data_playground',
+                transaction_per_migration=True,
             )
 
+            logger.info("Starting migrations")
             with context.begin_transaction():
                 context.run_migrations()
+            logger.info("Migrations completed")
 
     except Exception as e:
-        print(f"Error during migration: {e}")
+        logger.error(f"Error during migration: {str(e)}")
         raise
 
 if context.is_offline_mode():

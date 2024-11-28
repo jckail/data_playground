@@ -1,10 +1,9 @@
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import CreateSchema
 import os
 import logging
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
 from datetime import datetime
 import pytz
 from dateutil.parser import parse
@@ -45,20 +44,51 @@ engine = create_engine(
     }
 )
 
-# Create data_playground schema if it doesn't exist
-@event.listens_for(engine, 'connect')
-def create_data_playground_schema(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("CREATE SCHEMA IF NOT EXISTS data_playground")
-    cursor.execute("SET search_path TO data_playground")
-    cursor.close()
-
 # Create sessionmaker
 SessionLocal = sessionmaker(
     bind=engine,
     autocommit=False,
     autoflush=False,
 )
+
+def execute_ddl(query: str, retries=3):
+    """Execute a DDL query with retries."""
+    for attempt in range(retries):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("SET search_path TO data_playground"))
+                connection.execute(text(query))
+                return True
+        except SQLAlchemyError as e:
+            logger.error(f"DDL error on attempt {attempt + 1}: {str(e)}")
+            if attempt < retries - 1:
+                logger.warning(f"Retrying DDL operation...")
+                continue
+            raise e
+
+def execute_query(query: str, retries=3):
+    """Execute a SQL query with retries."""
+    for attempt in range(retries):
+        try:
+            with SessionLocal() as session:
+                with session.begin():  # Start a transaction
+                    # Set search_path for this query
+                    session.execute(text("SET search_path TO data_playground"))
+                    result = session.execute(text(query))
+                    
+                    # Check if this is a SELECT query
+                    if query.strip().upper().startswith('SELECT'):
+                        rows = result.fetchall()
+                        return [dict(row._mapping) for row in rows]
+                    return []
+                    
+        except SQLAlchemyError as e:
+            logger.warning(f"Database error on attempt {attempt + 1}: {str(e)}")
+            if attempt < retries - 1:
+                logger.warning("Retrying...")
+                continue
+            logger.error("Failed to execute query after multiple attempts.")
+            raise e
 
 def get_db():
     """Provides a database session."""
@@ -71,24 +101,6 @@ def get_db():
         db.close()
 
 logger.info("Database connection setup completed.")
-
-def execute_query(query: str, retries=3):
-    """Execute a SQL query with retries on interface errors."""
-    for attempt in range(retries):
-        try:
-            with SessionLocal() as session:
-                with session.begin():  # Start a transaction
-                    # Set search_path for this query
-                    session.execute(text("SET search_path TO data_playground"))
-                    result = session.execute(text(query))
-                    rows = result.fetchall()
-                    return [dict(row._mapping) for row in rows]
-        except SQLAlchemyError as e:
-            if attempt < retries - 1:
-                logger.warning(f"Database error on attempt {attempt + 1}, retrying...")
-                continue
-            logger.error("Failed to execute query after multiple attempts.")
-            raise e
 
 def parse_event_time(event_time):
     """Parse and return a datetime object from various input formats."""
