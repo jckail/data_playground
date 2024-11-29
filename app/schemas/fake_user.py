@@ -1,14 +1,14 @@
-# app/schemas/fake_user.py
-
-from pydantic import BaseModel, validator, EmailStr, UUID4
+from pydantic import BaseModel, validator, EmailStr, UUID4, constr
 from datetime import datetime
-from typing import Optional
-from typing import Dict
+from typing import Optional, Dict
 import uuid
 
 class FakeUserCreate(BaseModel):
+    username: constr(min_length=1, max_length=50)  # Match User model constraint
     email: EmailStr
+    phone_number: Optional[str] = None
     event_time: Optional[datetime] = None
+    extra_data: Optional[Dict] = None
 
     class Config:
         from_attributes = True
@@ -33,9 +33,14 @@ class FakeUserDeactivate(BaseModel):
         from_attributes = True
 
 class FakeUserResponse(BaseModel):
-    fake_user_id: UUID4  # Updated from user_id
+    id: UUID4
+    username: str
     email: EmailStr
+    phone_number: Optional[str]
+    status: bool
+    created_time: datetime
     event_time: datetime
+    extra_data: Optional[Dict]
 
     class Config:
         from_attributes = True

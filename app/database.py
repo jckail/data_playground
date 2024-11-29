@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, event, text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.schema import CreateSchema
+from sqlalchemy import text
 import os
 import logging
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,7 +17,7 @@ load_dotenv()
 
 # Database connection setup
 SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:password@localhost:5432/postgres"
+    "DATABASE_URL", "postgresql+asyncpg://postgres:password@localhost:5432/postgres"
 )
 
 # Get connection pool settings from environment variables
@@ -26,8 +26,8 @@ MAX_OVERFLOW = int(os.getenv("MAX_OVERFLOW", 10))
 POOL_TIMEOUT = int(os.getenv("POOL_TIMEOUT", 30))
 POOL_RECYCLE = int(os.getenv("POOL_RECYCLE", 1800))
 
-# Create the engine with SSL required and timeout settings
-engine = create_engine(
+# Create the async engine
+engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_size=POOL_SIZE,
     max_overflow=MAX_OVERFLOW,
@@ -44,61 +44,27 @@ engine = create_engine(
     }
 )
 
-# Create sessionmaker
-SessionLocal = sessionmaker(
+# Create async sessionmaker
+AsyncSessionLocal = sessionmaker(
     bind=engine,
     autocommit=False,
     autoflush=False,
+    expire_on_commit=False,
+    class_=AsyncSession,
 )
 
-def execute_ddl(query: str, retries=3):
-    """Execute a DDL query with retries."""
-    for attempt in range(retries):
+async def get_db():
+    """Provides an async database session."""
+    async with AsyncSessionLocal() as db:
         try:
-            with engine.begin() as connection:
-                connection.execute(text("SET search_path TO data_playground"))
-                connection.execute(text(query))
-                return True
-        except SQLAlchemyError as e:
-            logger.error(f"DDL error on attempt {attempt + 1}: {str(e)}")
-            if attempt < retries - 1:
-                logger.warning(f"Retrying DDL operation...")
-                continue
-            raise e
-
-def execute_query(query: str, retries=3):
-    """Execute a SQL query with retries."""
-    for attempt in range(retries):
-        try:
-            with SessionLocal() as session:
-                with session.begin():  # Start a transaction
-                    # Set search_path for this query
-                    session.execute(text("SET search_path TO data_playground"))
-                    result = session.execute(text(query))
-                    
-                    # Check if this is a SELECT query
-                    if query.strip().upper().startswith('SELECT'):
-                        rows = result.fetchall()
-                        return [dict(row._mapping) for row in rows]
-                    return []
-                    
-        except SQLAlchemyError as e:
-            logger.warning(f"Database error on attempt {attempt + 1}: {str(e)}")
-            if attempt < retries - 1:
-                logger.warning("Retrying...")
-                continue
-            logger.error("Failed to execute query after multiple attempts.")
-            raise e
-
-def get_db():
-    """Provides a database session."""
-    db = SessionLocal()
-    try:
-        # Set search_path for this session
-        db.execute(text("SET search_path TO data_playground"))
-        yield db
-    finally:
-        db.close()
+            # Set search_path for this session
+            await db.execute(text("SET search_path TO data_playground"))
+            yield db
+        except Exception:
+            await db.rollback()
+            raise
+        finally:
+            await db.close()
 
 logger.info("Database connection setup completed.")
 

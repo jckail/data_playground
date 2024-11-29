@@ -2,8 +2,8 @@ from fastapi import FastAPI, BackgroundTasks, Request, Response, Depends, HTTPEx
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from .routes import create_rollups, fake_users, events, shops, invoices, payments, fake_user_snapshot, shop_snapshot, generate_fake_data
-from app.core.scheduler import run_scheduler
+from .routes import create_rollups, fake_users, events, shops, invoices, payments, fake_user_snapshot, shop_snapshot, generate_fake_data, fake_user2
+#from app.core.scheduler import run_scheduler
 import threading
 from .tasks.fake_data_generator import run_async_generate_fake_data
 import logging
@@ -44,6 +44,7 @@ app.include_router(create_rollups.router)
 app.include_router(fake_user_snapshot.router)  # Updated from user_snapshot to fake_user_snapshot
 app.include_router(shop_snapshot.router)
 app.include_router(generate_fake_data.router)
+app.include_router(fake_user2.router)  # Added fake_user2 router
 
 # Prometheus metrics
 REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP Requests')
@@ -63,24 +64,24 @@ def sanitize_metric_name(name: str) -> str:
 async def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-@app.middleware("http")
-async def monitor_requests(request: Request, call_next):
-    # General request count and latency
-    REQUEST_COUNT.inc()
-    with REQUEST_LATENCY.time():
-        response = await call_next(request)
+# @app.middleware("http")
+# async def monitor_requests(request: Request, call_next):
+#     # General request count and latency
+#     REQUEST_COUNT.inc()
+#     with REQUEST_LATENCY.time():
+#         response = await call_next(request)
 
-    # Increment the counter for the specific endpoint
-    endpoint = request.url.path
-    sanitized_metric_name = sanitize_metric_name(endpoint.strip('/').replace('/', '_'))
+#     # Increment the counter for the specific endpoint
+#     endpoint = request.url.path
+#     sanitized_metric_name = sanitize_metric_name(endpoint.strip('/').replace('/', '_'))
 
-    if sanitized_metric_name not in ENDPOINT_COUNTERS:
-        metric_name = f"http_requests_total_{sanitized_metric_name}"
-        ENDPOINT_COUNTERS[sanitized_metric_name] = Counter(metric_name, f'Total HTTP Requests to {endpoint}')
+#     if sanitized_metric_name not in ENDPOINT_COUNTERS:
+#         metric_name = f"http_requests_total_{sanitized_metric_name}"
+#         ENDPOINT_COUNTERS[sanitized_metric_name] = Counter(metric_name, f'Total HTTP Requests to {endpoint}')
     
-    ENDPOINT_COUNTERS[sanitized_metric_name].inc()
+#     ENDPOINT_COUNTERS[sanitized_metric_name].inc()
 
-    return response
+#     return response
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -113,13 +114,13 @@ async def startup_event():
     
     # Check database connection
     # try:
-    #     await engine
+    #     await engine 
     #     logging.info("Successfully connected to the database")
     # except Exception as e:
     #     logging.error(f"Failed to connect to database: {str(e)}")
 
     # # Start the scheduler in a separate thread
-    threading.Thread(target=run_scheduler, daemon=True).start()
+    #threading.Thread(target=run_scheduler, daemon=True).start()
 
 @app.on_event("shutdown")
 async def shutdown_event():

@@ -1,10 +1,10 @@
 import logging
 import sqlalchemy as sa
 from datetime import datetime, timedelta
-from app.database import execute_ddl
 from app.models import *
 from sqlalchemy import inspect, text
 from typing import Union, List
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +38,7 @@ def generate_partition_name(tablename: str, partition_key: str) -> str:
     """Generate standardized partition table name"""
     return f"{tablename}_p_{partition_key.replace('-', '_').replace(':', '_')}".lower()
 
-def check_and_create_partition(connection, table_name: str, start_range: sa.DateTime, end_range: sa.DateTime = None):
+async def check_and_create_partition(connection: AsyncConnection, table_name: str, start_range: datetime, end_range: datetime = None):
     """Create partition(s) for a table within the specified time range"""
     try:
         logger.info(f"Creating partitions for table {table_name} from {start_range} to {end_range or start_range}")
@@ -52,7 +52,7 @@ def check_and_create_partition(connection, table_name: str, start_range: sa.Date
         # Get partition configuration
         partition_info = get_partition_info(model)
         if not partition_info:
-            logger.error(f"No partition configuration found for table {table_name}")
+            logger.error(f"No partition configuration found for model {model.__name__}")
             return False
 
         # If no end range specified, use start range
@@ -87,16 +87,17 @@ def check_and_create_partition(connection, table_name: str, start_range: sa.Date
                         WHERE schemaname = 'data_playground' AND tablename = :partition_name
                     )
                 """)
-                result = connection.execute(check_sql, {"partition_name": partition_name}).scalar()
+                result = await connection.execute(check_sql, {"partition_name": partition_name})
+                exists = result.scalar()
                 
-                if not result:
+                if not exists:
                     # Create partition if it doesn't exist
                     create_sql = text(f"""
                         CREATE TABLE IF NOT EXISTS data_playground.{partition_name}
                         PARTITION OF data_playground.{table_name}
                         FOR VALUES FROM ('{partition_key}') TO ('{next_key}')
                     """)
-                    connection.execute(create_sql)
+                    await connection.execute(create_sql)
                     logger.info(f"Created new partition {partition_name}")
                 else:
                     logger.info(f"Partition {partition_name} already exists")
@@ -114,7 +115,7 @@ def check_and_create_partition(connection, table_name: str, start_range: sa.Date
         logger.error(f"Error in check_and_create_partition for {table_name}: {str(e)}")
         raise
 
-def initialize_table(connection, tables: Union[str, List[str]], start_range: sa.DateTime = None, end_range: sa.DateTime = None):
+async def initialize_table(connection: AsyncConnection, tables: Union[str, List[str]], start_range: datetime = None, end_range: datetime = None):
     """Initialize partitions for one or more tables"""
     try:
         # Convert single table to list
@@ -134,7 +135,7 @@ def initialize_table(connection, tables: Union[str, List[str]], start_range: sa.
         results = {}
         for table in tables:
             try:
-                success = check_and_create_partition(connection, table, start_range, end_range)
+                success = await check_and_create_partition(connection, table, start_range, end_range)
                 results[table] = "Success" if success else "Failed"
                 logger.info(f"Partition initialization for {table}: {results[table]}")
             except Exception as e:
