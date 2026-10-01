@@ -1,137 +1,71 @@
-# Data Analytics Platform
+# Synthetic Data Playground
 
-A comprehensive data analytics and visualization platform demonstrating end-to-end data modeling, real-time analytics, and interactive dashboards. This project showcases full-stack development capabilities, data engineering practices, and modern DevOps approaches.
+A reproducible commerce pipeline that turns synthetic signup, shop activation,
+payment, and churn events into inspectable SQL metrics. Python owns generation,
+validation, quarantine, analytics, and export. The portfolio consumes versioned
+catalog artifacts and can optionally call the standalone service for custom runs.
+No database, credentials, or production data are required for this supported lab.
 
-## 🎯 Overview
+## Run locally
 
-This platform models and analyzes user journey data through various stages:
-- Lead → User signs up for the application
-- Prospect → User selects a plan and creates a shop
-- Customer → User completes first payment
-- Churn → User becomes inactive (non-payment or shop deletion)
+Use Python 3.12 with venv support:
 
-## 🏗 Architecture
-
-### Backend Services
-- **FastAPI Application**: RESTful API service with comprehensive data models and endpoints
-- **PostgreSQL Database**: Scalable data storage with partitioned tables
-- **Alembic**: Database migration management
-- **Background Tasks**: Automated data processing and rollup generation
-
-### Frontend & Visualization
-- **Streamlit Dashboard**: Interactive data visualization and analysis
-- **Grafana**: Real-time monitoring and custom dashboards
-- **Prometheus**: Metrics collection and monitoring
-
-### Data Pipeline
-- **Event Processing**: Real-time event capture and processing
-- **Data Modeling**: Structured data storage with temporal partitioning
-- **Analytics Generation**: Automated rollup and analytics calculation
-
-## 📊 Data Models
-
-### Global Events
-```sql
-CREATE TABLE global_events (
-    ts VARCHAR,           -- Hourly partition timestamp
-    event_id UUID,        -- Unique event identifier
-    event_time TIMESTAMP, -- Actual event timestamp
-    event_type ENUM,      -- Event classification
-    metadata JSONB,       -- Event-specific data
-    PRIMARY KEY (ts, event_id)
-);
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements-lab-dev.txt
+.venv/bin/python -m playground export --output artifacts/catalog.json
+.venv/bin/python -m playground simulate --seed 42 --days 30 --daily-signups 30
+.venv/bin/uvicorn playground.api:app --host 127.0.0.1 --port 8010 --workers 1
 ```
 
-### Core Tables
-- **Users**: User account information and metadata
-- **Shops**: Store configurations and relationships
-- **Plans**: Service tier definitions
-- **Invoices**: Billing records
-- **Payments**: Transaction tracking
+The export contains baseline, acquisition, retention, and data-quality scenarios.
+Open `http://127.0.0.1:8010/docs` for the API schema. Custom simulation example:
 
-## 🚀 Getting Started
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Start services:
-   ```bash
-   docker-compose up -d
-   ```
-4. Initialize database:
-   ```bash
-   alembic upgrade head
-   ```
-5. Run the application:
-   ```bash
-   ./helpers/local_test.sh
-   ```
-
-## 🔍 Key Features
-
-- **Real-time Analytics**: Live tracking of user activities and business metrics
-- **Interactive Dashboards**: Visual representation of data flows and user journeys
-- **Sankey Diagrams**: User flow visualization and conversion tracking
-- **Temporal Analysis**: Historical data analysis with point-in-time accuracy
-- **Automated Reporting**: Scheduled report generation and data rollups
-
-## 🛠 Development
-
-### API Endpoints
-- Frontend: `http://localhost:5173/`
-- Backend: `http://localhost:8080/`
-- Grafana: `http://localhost:3000/`
-
-### Monitoring
-- Application logs: `backend/app/logs/latestfile.log`
-- Metrics: Available through Prometheus/Grafana
-- Performance monitoring: Custom Grafana dashboards
-
-### Testing
-- Automated test data generation
-- Comprehensive API testing suite
-- Performance benchmarking tools
-
-## 📈 Data Flow
-
-```
-User Signs Up → Creates Shop → Pays Invoice → [Repeat/Churn]
+```bash
+curl --fail-with-body http://127.0.0.1:8010/api/simulate \
+  -H 'Content-Type: application/json' \
+  -d '{"seed":42,"days":30,"daily_signups":30,"churn_rate":0.01}'
 ```
 
-### Event Types
-1. **User Account Creation**
-   ```json
-   {
-       "user_id": "string",
-       "email": "string"
-   }
-   ```
-2. **Shop Creation**
-   ```json
-   {
-       "user_id": "string",
-       "shop_id": "string",
-       "plan_id": "string"
-   }
-   ```
-3. **Account/Shop Deletion**
-4. **Payment Processing**
+Alternatively, `docker compose -f compose.lab.yml up --build` starts only this lab
+on loopback port 8010, without any PostgreSQL dependency. The container runs as a
+non-root user with a read-only filesystem and CPU/memory limits.
 
-## 🤝 Contributing
+## Inspect and reproduce
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit changes
-4. Submit a pull request
+Each result includes aggregate metrics, daily series, conversion funnel, censored
+cohort retention, pipeline counts, quality checks, bounded event/quarantine
+samples, and SQL lineage. Money is integer cents. Revenue represents collected
+synthetic subscription payments, not MRR. Displayed churn is cumulative churned
+customers divided by ever-paying customers; the configuration rate is a daily
+hazard. Unobserved cohort ages are `null`, not zero retention.
 
-## 📝 License
+For the same complete configuration and engine version, the fixed start date
+(2025-01-01), seeded RNG, event IDs, results, and canonical exports are repeatable.
+Engine changes may change results; preserve `engine_version`, configuration, and
+catalog source metadata when publishing artifacts. All records are synthetic.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+See [architecture and API guide](docs/playground-architecture.md) for limits,
+processing boundaries, deployment integration, and validation details.
 
-## 🔗 Additional Resources
+## Test the supported lab
 
-- API Documentation: `/docs` endpoint
-- Grafana Dashboards: `grafana/dashboards/`
-- Configuration Templates: Available in respective service directories
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/ruff check playground tests
+```
+
+CI runs these checks and compares two catalog exports byte for byte. Tests cover
+repeatability, data-quality isolation, SQL reconciliation, cohort censoring,
+configuration bounds, API validation, streamed body limits, and worker capacity.
+Tests target `tests/` explicitly: root-level legacy `test_connection.py` and
+`test_supabase_permissions.py` connect to external databases and are not lab tests.
+
+## Legacy implementation
+
+`app.main`, `streamlit_app/`, the original `requirements.txt`, migrations, and the
+original Docker Compose files remain the earlier PostgreSQL/Streamlit experiment.
+They use a separate dependency set and database lifecycle. The new supported
+entrypoint is **`playground.api:app`**. This work does not establish that the legacy
+stack, its schema, or its asynchronous database operations are functional. Use
+`requirements-lab.txt` and `compose.lab.yml` for the synthetic playground.

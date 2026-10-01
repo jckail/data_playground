@@ -1,0 +1,8 @@
+FROM python:3.12-slim
+WORKDIR /lab
+COPY requirements-lab.txt .
+RUN pip install --no-cache-dir -r requirements-lab.txt
+COPY playground ./playground
+USER 65534:65534
+EXPOSE 8010
+CMD ["uvicorn", "playground.api:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "1"]

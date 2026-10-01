@@ -9,3 +9,8 @@ summaries
 final_summary.txt
 notes.txt
 offlinenotes.txt
+# Supported synthetic lab tooling
+.venv/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
