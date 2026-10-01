@@ -11,7 +11,8 @@ No database, credentials, or production data are required for this supported lab
 The React frontend is designed for [`jckail.com/dataplayground`](https://jckail.com/dataplayground)
 and integrates with the [portfolio repository](https://github.com/jckail/portfolio).
 Compare scenarios, inspect every validation boundary, filter event samples, and
-read the SQL behind conversion, collected revenue, and customer retention.
+read the SQL behind conversion, collected revenue, and customer retention. Explore
+a separate product dataset as a relationship graph and compare feature vectors.
 
 ![Data Playground frontend showing reproducible scenarios and pipeline stages](docs/images/playground.png)
 
@@ -69,6 +70,19 @@ catalog source metadata when publishing artifacts. All records are synthetic.
 
 See [architecture and API guide](docs/playground-architecture.md) for limits,
 processing boundaries, deployment integration, and validation details.
+
+## Graph and vector exploration
+
+The same export includes 48 invented products, 32 synthetic customers, and 160
+purchase rows. An 86-node graph connects customers, products, and six categories;
+purchase-edge weights aggregate quantities. Eight named, unit-normalized feature
+values per product support explainable cosine similarity. These are handcrafted
+features, not learned embeddings, and require no graph/vector database.
+
+This dataset is independent from the lifecycle simulations. See the
+[encoding, graph construction, and reproducibility guide](docs/exploration.md).
+
+![Graph neighborhoods and explainable product similarity](docs/images/graph-vectors.png)
 
 ## Test the supported lab
 
