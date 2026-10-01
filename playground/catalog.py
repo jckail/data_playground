@@ -34,6 +34,8 @@ def write_json_atomic(payload, output):
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+        # Catalogs contain public synthetic data and must be readable by image users.
+        os.chmod(temp_name, 0o644)
         os.replace(temp_name, output)
     finally:
         if temp_name is not None and os.path.exists(temp_name):

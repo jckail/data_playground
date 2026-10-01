@@ -6,6 +6,28 @@ validation, quarantine, analytics, and export. The portfolio consumes versioned
 catalog artifacts and can optionally call the standalone service for custom runs.
 No database, credentials, or production data are required for this supported lab.
 
+## Portfolio experience
+
+The React frontend is designed for [`jckail.com/dataplayground`](https://jckail.com/dataplayground)
+and integrates with the [portfolio repository](https://github.com/jckail/portfolio).
+Compare scenarios, inspect every validation boundary, filter event samples, and
+read the SQL behind conversion, collected revenue, and customer retention.
+
+![Data Playground frontend showing reproducible scenarios and pipeline stages](docs/images/playground.png)
+
+```mermaid
+flowchart LR
+    A[Seeded commerce events] --> B[Deduplicate]
+    B --> C[Validate schema]
+    C --> D[Check relationships and lifecycle]
+    D --> E[SQLite analytics]
+    B --> Q[Quarantine with reasons]
+    C --> Q
+    D --> Q
+    E --> F[Versioned catalog or bounded API]
+    F --> G[Portfolio lab]
+```
+
 ## Run locally
 
 Use Python 3.12 with venv support:

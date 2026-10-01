@@ -1,5 +1,7 @@
 """Business invariants, quality isolation, and deterministic artifact contract."""
 import json
+import os
+import stat
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -142,6 +144,8 @@ class PipelineTests(unittest.TestCase):
             path = Path(directory) / 'catalog.json'
             write_json_atomic(catalog, path)
             content = path.read_bytes()
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
             subprocess.run([sys.executable, '-m', 'playground', 'export', '--output', str(path)], check=True, capture_output=True)
             self.assertEqual(content, path.read_bytes())
             self.assertEqual(catalog, json.loads(content))
