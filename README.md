@@ -1,133 +1,60 @@
 # Synthetic Data Playground
 
-A reproducible commerce pipeline that turns synthetic signup, shop activation,
-payment, and churn events into inspectable SQL metrics. Python owns generation,
-validation, quarantine, analytics, and export. The portfolio consumes versioned
-catalog artifacts and can optionally call the standalone service for custom runs.
-No database, credentials, or production data are required for this supported lab.
+A deterministic commerce lab: generate events, validate their lifecycle, quarantine
+bad records and inspect the SQL behind conversion, revenue and retention. Everything
+is synthetic; the supported Python service needs no database or credentials.
 
-## Portfolio experience
+[Explore the portfolio UI](https://jckail.com/dataplayground) ·
+[Architecture](docs/architecture.mdx) ·
+[API and operations](docs/service-operations.mdx) ·
+[Design canvas](https://superdesign.dev/teams/daa6c1df-346f-4dc3-81dd-fb4f462aff90/projects/455b1495-879c-4308-8228-7c12040fa5a2)
 
-The React frontend is designed for [`jckail.com/dataplayground`](https://jckail.com/dataplayground)
-and integrates with the [portfolio repository](https://github.com/jckail/portfolio).
-Compare scenarios, inspect every validation boundary, filter event samples, and
-read the SQL behind conversion, collected revenue, and customer retention. Explore
-a separate product dataset as a relationship graph and compare feature vectors.
+## Quickstart
 
-![Data Playground frontend showing reproducible scenarios and pipeline stages](docs/images/playground.png)
-
-```mermaid
-flowchart LR
-    A[Seeded commerce events] --> B[Deduplicate]
-    B --> C[Validate schema]
-    C --> D[Check relationships and lifecycle]
-    D --> E[SQLite analytics]
-    B --> Q[Quarantine with reasons]
-    C --> Q
-    D --> Q
-    E --> F[Versioned catalog or bounded API]
-    F --> G[Portfolio lab]
-```
-
-## Run locally
-
-Use Python 3.12 with venv support:
+From the repository root, use Python 3.12 with venv support:
 
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements-lab-dev.txt
+.venv/bin/python -m playground simulate --seed 42 --days 7 --daily-signups 5
 .venv/bin/python -m playground export --output artifacts/catalog.json
-.venv/bin/python -m playground simulate --seed 42 --days 30 --daily-signups 30
 .venv/bin/uvicorn playground.api:app --host 127.0.0.1 --port 8010 --workers 1
 ```
 
-The export contains baseline, acquisition, retention, and data-quality scenarios.
-Open `http://127.0.0.1:8010/docs` for the API schema. Custom simulation example:
+The CLI works without a running service. The last command serves the optional API;
+open `http://127.0.0.1:8010/docs`. The exported catalog includes four scenarios,
+independent graph/vector exploration and executable architecture demonstrations.
+
+## What to explore
+
+| Topic | Guide |
+| --- | --- |
+| Pipeline, source ownership and result semantics | [Architecture](docs/architecture.mdx) |
+| Requests, limits, local operation and failure handling | [API and operations](docs/service-operations.mdx) |
+| Real DAG callbacks, retries and blocked dependencies | [Architecture workbench](docs/architecture-workbench.md) |
+| Synthetic graph and handcrafted feature vectors | [Exploration](docs/exploration.md) |
+| Detailed engine and portfolio adapter contract | [Implementation reference](docs/playground-architecture.md) |
+
+The [portfolio repository](https://github.com/jckail/portfolio) owns the React UI.
+This repository owns the headless service and reproducible catalog. Money is integer
+cents; collected revenue is not MRR. Unobserved retention ages are `null`, not zero.
+The same configuration, scenario and engine version reproduce the same result.
+
+## Verify
 
 ```bash
-curl --fail-with-body http://127.0.0.1:8010/api/simulate \
-  -H 'Content-Type: application/json' \
-  -d '{"seed":42,"days":30,"daily_signups":30,"churn_rate":0.01}'
-```
-
-Alternatively, `docker compose -f compose.lab.yml up --build` starts only this lab
-on loopback port 8010, without any PostgreSQL dependency. The container runs as a
-non-root user with a read-only filesystem and CPU/memory limits.
-
-## Inspect and reproduce
-
-Each result includes aggregate metrics, daily series, conversion funnel, censored
-cohort retention, pipeline counts, quality checks, bounded event/quarantine
-samples, and SQL lineage. Money is integer cents. Revenue represents collected
-synthetic subscription payments, not MRR. Displayed churn is cumulative churned
-customers divided by ever-paying customers; the configuration rate is a daily
-hazard. Unobserved cohort ages are `null`, not zero retention.
-
-For the same complete configuration and engine version, the fixed start date
-(2025-01-01), seeded RNG, event IDs, results, and canonical exports are repeatable.
-Engine changes may change results; preserve `engine_version`, configuration, and
-catalog source metadata when publishing artifacts. All records are synthetic.
-
-See [architecture and API guide](docs/playground-architecture.md) for limits,
-processing boundaries, deployment integration, and validation details.
-
-![Executable DAG replay and task contracts](docs/images/architecture-workbench.png)
-
-## Graph and vector exploration
-
-The same export includes 48 invented products, 32 synthetic customers, and 160
-purchase rows. An 86-node graph connects customers, products, and six categories;
-purchase-edge weights aggregate quantities. Eight named, unit-normalized feature
-values per product support explainable cosine similarity. These are handcrafted
-features, not learned embeddings, and require no graph/vector database.
-
-This dataset is independent from the lifecycle simulations. See the
-[encoding, graph construction, and reproducibility guide](docs/exploration.md).
-
-![Graph neighborhoods and explainable product similarity](docs/images/graph-vectors.png)
-
-## Test the supported lab
-
-```bash
-.venv/bin/python -m unittest discover -s tests -v
 .venv/bin/ruff check playground tests
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
-CI runs these checks and compares two catalog exports byte for byte. Tests cover
-repeatability, data-quality isolation, SQL reconciliation, cohort censoring,
-configuration bounds, API validation, streamed body limits, and worker capacity.
-Tests target `tests/` explicitly: root-level legacy `test_connection.py` and
-`test_supabase_permissions.py` connect to external databases and are not lab tests.
+CI also compares two catalog exports byte for byte. A separate pinned verification
+job exercises actual legacy chart/router modules with inert database and HTTP
+boundaries; see [verification details](docs/service-operations.mdx#verification).
 
-## Legacy implementation
+## Legacy boundary
 
-`app.main`, `streamlit_app/`, the original `requirements.txt`, migrations, and the
-original Docker Compose files remain the earlier PostgreSQL/Streamlit experiment.
-They use a separate dependency set and database lifecycle. The new supported
-entrypoint is **`playground.api:app`**. This work does not establish that the legacy
-stack, its schema, or its asynchronous database operations are functional. Use
-`requirements-lab.txt` and `compose.lab.yml` for the synthetic playground.
-
-## Architecture workbench
-
-Inspect the executable dependency DAG, real retry/failure traces, model grains and
-engineering tradeoffs in the additive catalog architecture metadata. Replay it
-locally with `.venv/bin/python -m playground orchestrate --failure none`; also try
-`analytics-transient` and `validation-permanent`. See the
-[architecture workbench guide](docs/architecture-workbench.md) for the exact local
-behavior and the separate production proposals.
-
-### Legacy dashboard verification and ports
-
-The legacy gateway in the original Compose stack uses `http://localhost:8000/`;
-its navigation uses same-origin `/docs`, `/streamlit/`, and `/prometheus` paths.
-Streamlit's internal upstream is port 8501; it is not a separate public frontend
-on port 5173. No Grafana service is enabled by the original Compose definition.
-The supported synthetic lab above remains on loopback port 8010.
-
-The legacy homepage now renders an explicit unavailable-report state when its
-ignored generated chart fragments are absent. Job controls report queued requests
-and failures, but do not track completion or regenerate those fragments. Legacy
-health and rollup handlers use the synchronous database session actually provided
-by `app.database`; remaining legacy model/task database operations are outside
-this bounded repair and are still not established as functional.
+`app.main`, `streamlit_app/`, migrations, `requirements.txt` and the original
+Compose files belong to the earlier PostgreSQL experiment. Its remaining database
+and scheduler operations are not established as functional. Use
+`playground.api:app`, `requirements-lab.txt` and `compose.lab.yml` for the supported
+lab. Hosted deployment is not configured by this repository.
