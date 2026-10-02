@@ -1,0 +1,14 @@
+services:
+  playground:
+    build:
+      context: .
+      dockerfile: Dockerfile.lab
+    ports:
+      - "127.0.0.1:8010:8010"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 64
+    restart: unless-stopped
