@@ -1,0 +1,122 @@
+---
+title: Data Playground architecture
+description: Source ownership, deterministic processing, published artifacts and the legacy boundary.
+---
+
+# Data Playground architecture
+
+The supported lab is an independent Python package under [`playground/`](../playground).
+It produces synthetic commerce results and a versioned catalog consumed by the
+[portfolio UI](https://jckail.com/dataplayground). It opens no external database and
+imports no legacy application settings.
+
+## Execution and ownership
+
+```mermaid
+flowchart LR
+    CLI[Python CLI] --> Engine[Simulation pipeline]
+    API[Bounded FastAPI service] --> Engine
+    Engine --> Result[Run result]
+    Result --> Catalog[Versioned catalog]
+    Graph[Independent product exploration] --> Catalog
+    DAG[Executed architecture demonstrations] --> Catalog
+    Catalog --> Presets[Portfolio preset scenarios]
+    API --> Adapter[Optional portfolio backend adapter]
+    Adapter --> Custom[Portfolio custom runs]
+```
+
+| Responsibility | Source |
+| --- | --- |
+| Input bounds and defaults | [`config.py`](../playground/config.py) |
+| Seeded event generation | [`simulation.py`](../playground/simulation.py) |
+| Validation, quarantine and result assembly | [`pipeline.py`](../playground/pipeline.py) |
+| SQLite aggregation and SQL lineage | [`analytics.py`](../playground/analytics.py) |
+| Presets and atomic JSON export | [`catalog.py`](../playground/catalog.py) |
+| Graph and feature-vector artifacts | [`exploration.py`](../playground/exploration.py) |
+| Executable local task DAG | [`architecture.py`](../playground/architecture.py) |
+| HTTP validation and capacity | [`api.py`](../playground/api.py) |
+| CLI commands | [`__main__.py`](../playground/__main__.py) |
+
+The React application and optional upstream adapter belong to the separate
+[portfolio repository](https://github.com/jckail/portfolio). There is no authored
+standalone frontend for the supported API. Swagger and ReDoc are generated
+framework documentation at `/docs` and `/redoc`.
+
+## The processing boundary
+
+```mermaid
+flowchart TD
+    Input[Bounded config and local seeded RNG] --> Raw[Synthetic signup activation payment churn events]
+    Raw --> Dedup[Deduplicate event IDs]
+    Dedup --> Validate[Validate fields relationships and lifecycle]
+    Dedup --> Reject[Quarantine with reasons]
+    Validate --> Reject
+    Validate --> Accepted[Accepted events]
+    Accepted --> SQLite[In-memory SQLite fixed queries]
+    SQLite --> Output[Summary daily funnel cohorts and lineage]
+    Accepted --> Samples[Bounded accepted-event sample]
+    Reject --> RejectedSamples[Bounded quarantine sample]
+    Output --> Result[Run result]
+    Samples --> Result
+    RejectedSamples --> Result
+```
+
+Only accepted events reach analytics. Python validates lifecycle and payment
+contracts before loading SQLite. The API accepts configuration, never arbitrary
+SQL, file destinations or job definitions. Responses contain at most 100 accepted
+examples and 50 quarantined examples; the samples are not complete input datasets.
+
+[`run_simulation`](../playground/pipeline.py) returns `id`, `scenario`, `config`,
+`summary`, `daily`, `funnel`, `cohorts`, `pipeline`, `quality`, `events`,
+`quarantined` and `lineage`. The catalog wraps runs with `schema_version`,
+`engine_version` and `source`, plus independent `exploration` and `architecture`
+artifacts. Preserve that wrapper when moving a catalog between repositories.
+
+## Reproducibility and metric meaning
+
+Generation uses a fixed start date of 2025-01-01, a local seeded RNG and
+deterministic IDs. Result identity includes configuration, scenario and both
+version fields. A reproducible comparison keeps all of those inputs constant;
+a changed engine can change the output for the same seed.
+
+Money is integer cents. Revenue is collected synthetic subscription payments,
+not MRR. Reported churn is cumulative churned customers divided by ever-paying
+customers; configured `churn_rate` is a daily hazard. Cohort ages outside the
+observation window are `null`, not zero retention.
+
+The four presets are baseline, acquisition surge, stronger retention and data
+quality incident. The graph/vector dataset is separate: 48 invented products,
+32 synthetic customers and 160 purchase rows. Its vectors are eight handcrafted,
+normalized features, not learned embeddings or a remote vector index. See the
+[exploration guide](exploration.md) for encodings and similarity semantics.
+
+## Local orchestration and production proposals
+
+Replay real callbacks without an API, database or external scheduler:
+
+```bash
+.venv/bin/python -m playground orchestrate --failure none
+.venv/bin/python -m playground orchestrate --failure analytics-transient
+.venv/bin/python -m playground orchestrate --failure validation-permanent
+```
+
+The transient demonstration retries analytics; permanent validation failure blocks
+its dependent tasks while the independent exploration branch can still execute.
+Record quarantine and task failure are different outcomes. The scheduler performs
+no network or cloud writes; `--output` explicitly asks the CLI to write JSON.
+
+Model grains, constraints, callback traces and engineering decisions are explained
+in [the architecture workbench](architecture-workbench.md). Proposed durable
+storage, publication pointers and distributed replay controls are design records,
+not implemented production infrastructure or exactly-once guarantees.
+
+## Retained legacy experiment
+
+`app.main` and `streamlit_app/` use PostgreSQL and separate dependencies. They are
+not part of the supported engine or its Docker image. The legacy home now handles
+missing report files and queued-job feedback, but those repairs do not establish
+that its database, schema or scheduler operations work. The design canvas contains
+those legacy page imports; the supported React experience remains in Portfolio.
+
+Continue with [API contracts and operations](service-operations.mdx), or return to
+[the quickstart](../README.md).

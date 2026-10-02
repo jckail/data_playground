@@ -1,0 +1,163 @@
+---
+title: Synthetic service contracts and operations
+description: Run, query, verify and troubleshoot the supported headless Data Playground service.
+---
+
+# Synthetic service contracts and operations
+
+These commands run from the repository root with the Python 3.12 environment
+created in [the README](../README.md). Use `playground.api:app`; the legacy
+`app.main` entrypoint has a different database and scheduler lifecycle.
+
+## Run and stop locally
+
+```bash
+.venv/bin/uvicorn playground.api:app --host 127.0.0.1 --port 8010 --workers 1
+```
+
+Run the server in its own terminal and stop it with Ctrl+C. Open
+`http://127.0.0.1:8010/docs` for generated OpenAPI documentation. An alternative
+container run uses the existing supported Compose file:
+
+```bash
+docker compose -f compose.lab.yml up --build
+docker compose -f compose.lab.yml down
+```
+
+The second command runs in another terminal. Compose binds `127.0.0.1:8010`,
+runs a non-root image with a read-only filesystem, drops capabilities and sets
+512 MB memory, one CPU and 64-process limits. It starts no PostgreSQL service.
+This is a local runtime option; the repository specifies no hosted destination or
+production delivery workflow. One Uvicorn worker preserves the documented
+per-process capacity bound.
+
+## HTTP contract
+
+| Method | Endpoint | Successful response |
+| --- | --- | --- |
+| GET | `/health` | Status, schema/engine versions and `synthetic: true` |
+| GET | `/api/catalog` | Versioned catalog with four scenario runs, exploration and architecture |
+| POST | `/api/simulate` | One run result for a bounded configuration |
+
+```bash
+curl --fail-with-body http://127.0.0.1:8010/health
+curl --fail-with-body http://127.0.0.1:8010/api/catalog -o /tmp/playground-catalog.json
+curl --fail-with-body http://127.0.0.1:8010/api/simulate \
+  -H 'Content-Type: application/json' \
+  -d '{"seed":42,"days":7,"daily_signups":5,"churn_rate":0.01}'
+```
+
+`/health` reports application availability and versions. It does not probe a
+remote database, validate a hosted deployment, or prove a completed simulation.
+The catalog is cached in process memory; a process restart clears that cache.
+
+### Configuration and errors
+
+Omitted JSON fields use the defaults below, sourced from
+[`SimulationRequest`](../playground/api.py) and [`SimulationConfig`](../playground/config.py).
+
+| Field | Default | Bounds |
+| --- | --- | --- |
+| `seed` | 42 | Integer 0–2147483647 |
+| `days` | 30 | Integer 7–90 |
+| `daily_signups` | 30 | Integer 5–100 |
+| `activation_rate` | 0.65 | Finite number 0–1 |
+| `payment_rate` | 0.35 | Finite number 0–1 |
+| `churn_rate` | 0.02 | Finite number 0–0.2 |
+| `duplicate_rate` | 0.03 | Finite number 0–0.2 |
+| `invalid_rate` | 0.02 | Finite number 0–0.2 |
+
+| Status | Meaning | Caller action |
+| --- | --- | --- |
+| 422 | Invalid JSON, unknown field, numeric string, boolean-as-number, non-finite or out-of-range value | Correct the request; inspect validation `detail` |
+| 413 | More than 4096 actual body bytes, including streamed bodies | Send only the bounded configuration object |
+| 429 | Both catalog/simulation worker slots occupied | Respect `Retry-After: 1` and retry with bounded backoff |
+| 500 | Unhandled service failure | Inspect service logs; do not replace the result with a preset silently |
+
+Capacity is shared by catalog and simulation calls within each process. Worker
+slots remain held until computation exits, including after a client disconnect.
+Running additional workers changes total capacity; cancellation does not terminate
+the Python computation. The service has no user authentication or per-user quota.
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant A as FastAPI service
+    participant W as Bounded worker
+    C->>A: POST bounded configuration
+    A->>A: Body size and strict field validation
+    alt Invalid request
+        A-->>C: 413 or 422
+    else Worker capacity exhausted
+        A-->>C: 429 and Retry-After
+    else Slot acquired
+        A->>W: Deterministic simulation
+        W->>W: Validate and aggregate accepted events
+        W-->>A: Run result; release slot in finally
+        A-->>C: 200 JSON
+    end
+```
+
+## Export and inspect without a server
+
+```bash
+.venv/bin/python -m playground simulate --seed 42 --days 7 --daily-signups 5 \
+  --output /tmp/playground-run.json
+.venv/bin/python -m playground export --output /tmp/playground-a.json
+.venv/bin/python -m playground export --output /tmp/playground-b.json
+cmp /tmp/playground-a.json /tmp/playground-b.json
+.venv/bin/python -m playground orchestrate --failure analytics-transient \
+  --output /tmp/playground-dag.json
+```
+
+Exports create parent directories and replace the destination only after a complete
+JSON file has been written and fsynced on the same volume. Canonical JSON uses
+sorted keys and rejects non-finite values. Preserve `schema_version`,
+`engine_version`, configuration and catalog `source` metadata when publishing a
+fixture; event samples cannot reconstruct the complete dataset.
+
+## Portfolio integration
+
+Preset browsing uses a committed catalog and needs no running service. Optional
+custom runs use the portfolio backend's `DATAPLAYGROUND_API_URL` configuration.
+Both local processes can use `http://127.0.0.1:8010`; separate containers need the
+service's internal address instead of their own loopback. The browser calls
+portfolio same-origin endpoints, not an upstream URL.
+
+Configuration and delivery belong to the portfolio's existing environment and
+release process. This guide does not modify that environment. See
+[the implementation reference](playground-architecture.md#portfolio-integration-and-deployment)
+for the adapter contract and failure semantics.
+
+## Verification
+
+```bash
+.venv/bin/ruff check playground tests
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+The [Synthetic lab workflow](../.github/workflows/lab.yml) runs these checks and
+compares two catalog exports byte for byte. Its separate `legacy-presentation`
+job installs [`requirements-legacy-verification.txt`](../requirements-legacy-verification.txt)
+in an isolated environment and verifies real Jinja, Plotly, SQLAlchemy and FastAPI
+modules with inert database and outbound HTTP boundaries. Those optional runtime
+cases can be skipped in the supported-only local environment; the separate job
+must pass them without skips.
+
+Target `tests/` explicitly. Root-level legacy connection scripts access external
+databases and are outside this verification path. Legacy runtime tests do not
+start `app.main`, its scheduler or fake-data jobs. Their passing results do not
+certify the broader retained legacy stack.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Port 8010 is already bound | Identify its owner before starting another service; reuse or stop only your own instance |
+| Simulation returns 422 | Check exact types, bounds and unknown keys against the table above |
+| Requests return 429 | Reduce concurrent calls and honor the retry header; keep the one-worker deployment assumption explicit |
+| Catalog differs between exports | Compare full configuration, scenario and engine/source revisions before interpreting changes |
+| Legacy home shows unavailable reports | Generated fragments are absent; this says nothing about database record counts |
+| Portfolio custom runs fail | Check its configured upstream and adapter logs; preset browsing is independent |
+
+Return to [architecture](architecture.mdx) or [the quickstart](../README.md).
