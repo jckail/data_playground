@@ -26,8 +26,8 @@ async def execute_query(query: str, max_retries=3, delay=1):
                 delay *= 2  # Exponential backoff
             else:
                 logger.error(f"Query failed after {max_retries} attempts: {e}")
-                return []  # Return an empty list instead of raising an exception
-    return []  # This line should never be reached, but it's here for completeness
+                raise  # Preserve query failures so the UI can distinguish them from empty data.
+    raise RuntimeError('Query did not produce a result')
 
 
 # Define your SQL queries

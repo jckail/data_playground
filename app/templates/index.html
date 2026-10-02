@@ -1,99 +1,86 @@
-<html>
-    <head>
-        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-            }
-            .navbar {
-                overflow: hidden;
-                background-color: #333;
-                position: fixed;
-                top: 0;
-                width: 100%;
-                z-index: 1000;
-            }
-            .navbar a {
-                float: left;
-                display: block;
-                color: #f2f2f2;
-                text-align: center;
-                padding: 14px 16px;
-                text-decoration: none;
-            }
-            .navbar a:hover {
-                background-color: #ddd;
-                color: black;
-            }
-            .navbar button {
-                float: left;
-                padding: 14px 16px;
-                background-color: #333;
-                color: #f2f2f2;
-                border: none;
-                cursor: pointer;
-            }
-            .navbar button:hover {
-                background-color: #ddd;
-                color: black;
-            }
-            .navbar img {
-                float: left;
-                height: 30px;
-                padding: 8px 16px;
-                filter: invert(100%);
-            }
-            .content {
-                margin-top: 60px;
-                padding: 20px;
-            }
-            .plot-container {
-                width: 100%;
-                height: 500px;
-                margin-bottom: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="navbar">
-            <img src="/static/playground-icon.svg" alt="Playground Logo">
-            <a href="http://0.0.0.0:8000/docs" target="_blank">Go to Docs</a>
-            <a href="http://0.0.0.0:8000/streamlit" target="_blank">Go to Streamlit Dashboard</a>
-            <a href="http://0.0.0.0:8000/prometheus" target="_blank">Go to Prometheus Dashboard</a>
-            <button onclick="triggerFakeData()">Generate Fake Data</button>
-            <button onclick="triggerFakeRollups()">Trigger Rollups</button>
-        </div>
-        <div class="content">
-            <h2>Users and Shops Over Time</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Data Playground · Legacy Analytics</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #222; }
+        .navbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px; background: #333; color: #f2f2f2; }
+        .navbar a, .navbar button { display: inline-flex; align-items: center; min-height: 44px; padding: 12px 16px; color: #f2f2f2; background: #333; text-decoration: none; border: 0; font: inherit; cursor: pointer; }
+        .navbar a:hover, .navbar button:hover { background: #ddd; color: black; }
+        .navbar a:focus-visible, .navbar button:focus-visible { outline: 3px solid #8bc8ff; outline-offset: 2px; }
+        .navbar button:disabled { opacity: .65; cursor: wait; }
+        .navbar img { height: 30px; margin: 0 8px; filter: invert(100%); }
+        .content { max-width: 1440px; margin: auto; padding: 20px; }
+        h1 { font-size: 1.8rem; }
+        .plot-container { width: 100%; min-height: 160px; margin-bottom: 24px; overflow: auto; }
+        .chart-empty { padding: 24px; background: #f5f5f5; border: 1px solid #ddd; line-height: 1.6; }
+        #action-status { min-height: 1.5em; line-height: 1.6; }
+        @media (max-width: 480px) { .content { padding: 16px; } .navbar a, .navbar button { flex: 1 1 45%; justify-content: center; padding: 10px; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar" aria-label="Analytics tools">
+        <img src="/static/playground-icon.svg" alt="Data Playground">
+        <a href="/docs">Go to Docs</a>
+        <a href="/streamlit/">Go to Streamlit Dashboard</a>
+        <a href="/prometheus">Go to Prometheus Dashboard</a>
+        <button type="button" data-endpoint="/auto_refresh_fake_data" data-label="Data generation">Generate Fake Data</button>
+        <button type="button" data-endpoint="/create_rollups" data-label="Rollups">Trigger Rollups</button>
+    </nav>
+    <main class="content">
+        <h1>Legacy analytics dashboard</h1>
+        <p>Charts show generated report snapshots. Submitting a job confirms that it was queued; it does not confirm completion or refresh these charts.</p>
+        <p id="action-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <section aria-labelledby="users-title">
+            <h2 id="users-title">Users and Shops Over Time</h2>
             <div id="users_shops_plot" class="plot-container">
-                {% include "users_shops_plot.html" %}
+                {% include ["users_shops_plot.html", "chart-unavailable.html"] %}
             </div>
-            <h2>Events Over Time</h2>
+        </section>
+        <section aria-labelledby="events-title">
+            <h2 id="events-title">Events Over Time</h2>
             <div id="events_plot" class="plot-container">
-                {% include "events_plot.html" %}
+                {% include ["events_plot.html", "chart-unavailable.html"] %}
             </div>
-            <h2>Status Code Counts Per Minute for the Most Recent Hour</h2>
+        </section>
+        <section aria-labelledby="status-title">
+            <h2 id="status-title">Status Code Counts Per Minute for the Latest Recorded Hour</h2>
+            <p>This is the latest hour present in the generated report and may be historical data.</p>
             <div id="status_code_plot" class="plot-container">
-                {% include "status_code_plot.html" %}
+                {% include ["status_code_plot.html", "chart-unavailable.html"] %}
             </div>
-        </div>
-
-        <script>
-            function triggerFakeData() {
-                fetch('/auto_refresh_fake_data', {
-                    method: 'POST'
-                }).then(response => response.json())
-                  .then(data => alert(data.message))
-                  .catch(error => console.error('Error:', error));
+        </section>
+    </main>
+    <script>
+        const actionStatus = document.getElementById('action-status');
+        const jobButtons = Array.from(document.querySelectorAll('button[data-endpoint]'));
+        let jobPending = false;
+        jobButtons.forEach(button => button.addEventListener('click', async () => {
+            if (jobPending) return;
+            jobPending = true;
+            jobButtons.forEach(item => item.disabled = true);
+            actionStatus.textContent = `Submitting ${button.dataset.label.toLowerCase()}…`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
+            try {
+                const response = await fetch(button.dataset.endpoint, { method: 'POST', signal: controller.signal });
+                if (!response.ok) {
+                    actionStatus.textContent = `Could not queue ${button.dataset.label.toLowerCase()} (HTTP ${response.status}). Check the service before retrying.`;
+                    return;
+                }
+                actionStatus.textContent = `${button.dataset.label} queued. Completion is not tracked here; these charts have not refreshed.`;
+            } catch (error) {
+                actionStatus.textContent = 'The request could not be confirmed. It may already have been queued. Check the service before retrying to avoid duplicate jobs.';
+            } finally {
+                clearTimeout(timeout);
+                jobPending = false;
+                jobButtons.forEach(item => item.disabled = false);
             }
-
-            function triggerFakeRollups() {
-                fetch('/create_rollups', {
-                    method: 'POST'
-                }).then(response => response.json())
-                  .then(data => alert(data.message))
-                  .catch(error => console.error('Error:', error));
-            }
-        </script>
-    </body>
+        }));
+    </script>
+</body>
 </html>

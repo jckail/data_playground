@@ -51,19 +51,20 @@ def app_logic():
         plot_functions = [
             ('Users and Shops Count Over Time', create_users_shops_plot),
             ('Event Counts Over Time', create_events_plot),
-            ('Status Code Counts Per Minute (Last Hour)', create_status_code_plot),
+            ('Status Code Counts Per Minute (Latest Recorded Hour)', create_status_code_plot),
             ('User and Shop Activity Flow (Last 30 Days)', create_sankey_diagram)
         ]
 
         for i, (title, _) in enumerate(plot_functions):
             result = results[i]
             if isinstance(result, Exception):
-                st.error(f"Error occurred while creating {title}: {str(result)}")
+                logger.error("Chart preparation failed: %s", title, exc_info=(type(result), result, result.__traceback__))
+                st.error(f"Could not load {title}. Please try again later.")
             else:
                 st.subheader(title)
                 if i == 0:  # Users and Shops plot
                     fig, users_data, shops_data = result
-                    if users_data and shops_data:
+                    if users_data or shops_data:
                         st.plotly_chart(fig)
                         st.write('Users Data:')
                         st.write(users_data)
@@ -75,6 +76,9 @@ def app_logic():
                     fig, data = result
                     if data:
                         st.plotly_chart(fig)
+                        if i == 2:
+                            minutes = [row["minute"] for row in data]
+                            st.caption(f"Recorded interval: {min(minutes)} to {max(minutes)}. This may be historical data.")
                         st.write(f'Raw data for {title}:')
                         st.write(data)
                     else:
