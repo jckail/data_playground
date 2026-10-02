@@ -11,18 +11,19 @@ async def create_users_shops_plot():
         users_data = await execute_query(users_query)
         shops_data = await execute_query(shops_query)
 
-        if not users_data or not shops_data:
+        if not users_data and not shops_data:
             logger.warning("No data returned for users or shops query")
             return go.Figure(), [], []
 
         dates = [row['partition_key'] for row in users_data]
         users_counts = [row['b'] for row in users_data]
+        shops_dates = [row['partition_key'] for row in shops_data]
         shops_counts = [row['b'] for row in shops_data]
 
         fig = go.Figure()
 
         fig.add_trace(go.Scatter(x=dates, y=users_counts, mode='lines', name='Users', line=dict(color='green')))
-        fig.add_trace(go.Scatter(x=dates, y=shops_counts, mode='lines', name='Shops', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=shops_dates, y=shops_counts, mode='lines', name='Shops', line=dict(color='blue')))
 
         fig.update_layout(
             title='Users and Shops Count Over Time',
@@ -32,9 +33,9 @@ async def create_users_shops_plot():
         )
 
         return fig, users_data, shops_data
-    except Exception as e:
-        logger.error(f"Error creating users and shops plot: {e}")
-        return go.Figure(), [], []
+    except Exception:
+        logger.exception("Could not prepare chart")
+        raise
 
 async def create_events_plot():
     try:
@@ -80,9 +81,9 @@ async def create_events_plot():
         )
 
         return fig, events_data
-    except Exception as e:
-        logger.error(f"Error creating events plot: {e}")
-        return go.Figure(), []
+    except Exception:
+        logger.exception("Could not prepare chart")
+        raise
 
 async def create_status_code_plot():
     try:
@@ -116,7 +117,7 @@ async def create_status_code_plot():
             ))
 
         fig.update_layout(
-            title='Status Code Counts Per Minute for the Most Recent Hour',
+            title='Status Code Counts Per Minute for the Latest Recorded Hour',
             xaxis_title='Time (Minute Intervals)',
             yaxis_title='Count',
             legend_title='Status Code',
@@ -128,9 +129,9 @@ async def create_status_code_plot():
         )
 
         return fig, status_code_data
-    except Exception as e:
-        logger.error(f"Error creating status code plot: {e}")
-        return go.Figure(), []
+    except Exception:
+        logger.exception("Could not prepare chart")
+        raise
 
 async def create_sankey_diagram():
     try:
@@ -179,6 +180,6 @@ async def create_sankey_diagram():
         fig.update_layout(title_text="User and Shop Activity Flow", font_size=10)
 
         return fig, sankey_data
-    except Exception as e:
-        logger.error(f"Error creating Sankey diagram: {e}")
-        return go.Figure(), []
+    except Exception:
+        logger.exception("Could not prepare chart")
+        raise

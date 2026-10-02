@@ -116,3 +116,18 @@ locally with `.venv/bin/python -m playground orchestrate --failure none`; also t
 `analytics-transient` and `validation-permanent`. See the
 [architecture workbench guide](docs/architecture-workbench.md) for the exact local
 behavior and the separate production proposals.
+
+### Legacy dashboard verification and ports
+
+The legacy gateway in the original Compose stack uses `http://localhost:8000/`;
+its navigation uses same-origin `/docs`, `/streamlit/`, and `/prometheus` paths.
+Streamlit's internal upstream is port 8501; it is not a separate public frontend
+on port 5173. No Grafana service is enabled by the original Compose definition.
+The supported synthetic lab above remains on loopback port 8010.
+
+The legacy homepage now renders an explicit unavailable-report state when its
+ignored generated chart fragments are absent. Job controls report queued requests
+and failures, but do not track completion or regenerate those fragments. Legacy
+health and rollup handlers use the synchronous database session actually provided
+by `app.database`; remaining legacy model/task database operations are outside
+this bounded repair and are still not established as functional.

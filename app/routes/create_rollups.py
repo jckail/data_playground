@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import text
 from ..database import get_db
 import logging
@@ -36,11 +36,11 @@ async def run_rollup(current_date, endpoint):
         raise
 
 @router.post("/create_rollups")
-async def create_rollups(
+def create_rollups(
     background_tasks: BackgroundTasks, 
     start_date: datetime = None, 
     end_date: datetime = None, 
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     try:
         dates = []
@@ -53,7 +53,7 @@ async def create_rollups(
                 FROM global_events
                 ORDER BY event_date
             """)
-            result = await db.execute(date_query)
+            result = db.execute(date_query)
             dates = [row.event_date for row in result.fetchall()]
             
             if not dates:
@@ -76,8 +76,10 @@ async def create_rollups(
 
         return {"message": f"Rollups creation tasks have been initiated between {start_date} and {end_date}"}
     
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to create rollups: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create rollups: {str(e)}")
+        logger.exception("Failed to create rollups")
+        raise HTTPException(status_code=500, detail="Could not queue rollups. Please try again later.") from e
 
 

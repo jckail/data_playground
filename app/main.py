@@ -13,7 +13,7 @@ from .database import get_db, parse_event_time, engine
 from datetime import datetime
 from .models import RequestResponseLog
 import pytz
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import text
 import psutil
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram
@@ -98,12 +98,13 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 @app.get("/health/")
-async def health_check(db: AsyncSession = Depends(get_db)):
+def health_check(db: Session = Depends(get_db)):
     try:
-        await db.execute(text("SELECT 1"))
+        db.execute(text("SELECT 1"))
         return {"status": "healthy"}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database unavailable: {str(e)}")
+        logger.exception("Legacy database health check failed")
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
 
 @app.on_event("startup")
 async def startup_event():
