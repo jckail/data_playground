@@ -1,0 +1,7 @@
+# Focused legacy presentation verification; never starts the database or scheduler.
+# Framework/chart pins match legacy requirements.txt; Jinja includes upstream fixes.
+fastapi==0.112.0
+httpx==0.27.0
+Jinja2==3.1.6
+plotly==5.23.0
+SQLAlchemy==2.0.23
