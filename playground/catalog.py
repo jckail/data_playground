@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 from . import ENGINE_VERSION, SCHEMA_VERSION
 from .config import SimulationConfig
+from .architecture import build_architecture
 from .exploration import build_exploration
 from .pipeline import run_simulation
 
@@ -20,6 +21,7 @@ def build_catalog():
     return dict(schema_version=SCHEMA_VERSION, engine_version=ENGINE_VERSION,
                 source=dict(repository="https://github.com/jckail/data_playground", command="python -m playground export --output artifacts/catalog.json"),
                 exploration=build_exploration(),
+                architecture=build_architecture(),
                 runs=[run_simulation(SimulationConfig(**overrides), dict(id=key, name=name, description=description))
                       for key, name, description, overrides in SCENARIOS])
 
