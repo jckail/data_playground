@@ -71,6 +71,8 @@ catalog source metadata when publishing artifacts. All records are synthetic.
 See [architecture and API guide](docs/playground-architecture.md) for limits,
 processing boundaries, deployment integration, and validation details.
 
+![Executable DAG replay and task contracts](docs/images/architecture-workbench.png)
+
 ## Graph and vector exploration
 
 The same export includes 48 invented products, 32 synthetic customers, and 160
@@ -105,3 +107,12 @@ They use a separate dependency set and database lifecycle. The new supported
 entrypoint is **`playground.api:app`**. This work does not establish that the legacy
 stack, its schema, or its asynchronous database operations are functional. Use
 `requirements-lab.txt` and `compose.lab.yml` for the synthetic playground.
+
+## Architecture workbench
+
+Inspect the executable dependency DAG, real retry/failure traces, model grains and
+engineering tradeoffs in the additive catalog architecture metadata. Replay it
+locally with `.venv/bin/python -m playground orchestrate --failure none`; also try
+`analytics-transient` and `validation-permanent`. See the
+[architecture workbench guide](docs/architecture-workbench.md) for the exact local
+behavior and the separate production proposals.
