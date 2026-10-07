@@ -118,5 +118,18 @@ missing report files and queued-job feedback, but those repairs do not establish
 that its database, schema or scheduler operations work. The design canvas contains
 those legacy page imports; the supported React experience remains in Portfolio.
 
+The rest of the retained experiment sits at the repository root and is likewise
+outside the supported lab:
+
+| Path | Role in the legacy experiment |
+| --- | --- |
+| `docker-compose.yml`, `docker-compose-local.yml` | Original stacks: Nginx, FastAPI, Streamlit and Prometheus, plus PostgreSQL in the local file |
+| `Dockerfile.fastapi`, `Dockerfile.streamlit`, `Dockerfile.disk_monitor` | Images for those services |
+| `alembic/`, `alembic.ini`, `rinit.sql` | Migrations, the partitioned [data model notes](../alembic/DataModel.md) and initial SQL |
+| `nginx/`, `prometheus/`, `grafana/` | Reverse proxy, metrics scrape and dashboard configuration |
+| `helpers/`, `wait_for_db.py`, `disk_monitor.py` | Migration/startup helper scripts and a disk-usage metrics exporter |
+| `run_query.py`, `test_connection.py`, `test_supabase_permissions.py` | Root-level database scripts that connect to an external database; not part of `tests/` |
+| `fake_data_reports/` | Generated report output from 2024 runs of the old data generator |
+
 Continue with [API contracts and operations](service-operations.mdx), or return to
 [the quickstart](../README.md).
