@@ -40,6 +40,16 @@ This repository owns the headless service and reproducible catalog. Money is int
 cents; collected revenue is not MRR. Unobserved retention ages are `null`, not zero.
 The same configuration, scenario and engine version reproduce the same result.
 
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| [playground/](playground/) | Supported lab: simulation, pipeline, analytics, catalog, CLI and API |
+| [tests/](tests/) | Unit tests for the lab plus legacy verification |
+| [docs/](docs/) | Architecture, operations and exploration guides |
+| [compose.lab.yml](compose.lab.yml) | Optional hardened container for the lab API |
+| [app/](app/), [streamlit_app/](streamlit_app/), [alembic/](alembic/) | Legacy PostgreSQL experiment (see below) |
+
 ## Verify
 
 ```bash
