@@ -136,7 +136,7 @@ for the adapter contract and failure semantics.
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The [Synthetic lab workflow](../.github/workflows/lab.yml) runs these checks and
+The [Depot CI workflow](../.depot/workflows/ci.yml) runs these checks and
 compares two catalog exports byte for byte. Its separate `legacy-presentation`
 job installs [`requirements-legacy-verification.txt`](../requirements-legacy-verification.txt)
 in an isolated environment and verifies real Jinja, Plotly, SQLAlchemy and FastAPI

@@ -15,3 +15,6 @@ offlinenotes.txt
 .ruff_cache/
 .pytest_cache/
 __pycache__/
+
+# Agent worktrees (shared engineering standards)
+.worktrees/
